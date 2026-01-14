@@ -75,34 +75,41 @@ class LandingToBronzeOperator(BaseOperator):
             return None
 
     def _get_new_schema_from_gcs(self, hook):
-        external_config = {
-            "sourceUris": self.bronze_external_uris,
-            "sourceFormat": "PARQUET",
-            "autodetect": True,
-            "hivePartitioningOptions": {
-                "mode": "AUTO",
-                "sourceUriPrefix": self.hive_partition_uri_prefix,
-            },
-        }
+        parts = self.bronze_table_id.split(".")
+        bq_dataset_id = parts[-2]
+        bq_table_id = parts[-1]
+
         job_config = {
-            "query": {"query": "SELECT 1", "useLegacySql": False},
-            "externalDataConfiguration": external_config,
+            "load": {
+                "sourceUris": self.bronze_external_uris,
+                "sourceFormat": "PARQUET",
+                "autodetect": True,
+                "writeDisposition": "WRITE_TRUNCATE",
+                "destinationTable": {
+                    "projectId": self.project_id,
+                    "datasetId": bq_dataset_id,
+                    "tableId": bq_table_id,
+                },
+                "hivePartitioningOptions": {
+                    "mode": "AUTO",
+                    "sourceUriPrefix": self.hive_partition_uri_prefix,
+                },
+            },
             "dryRun": True,
         }
 
+        self.log.info("Submitting Dry Run Load Job to infer schema...")
+
         job = hook.insert_job(configuration=job_config, project_id=self.project_id)
 
-        self.log.info(f"Job submitted: {job.job_id}")
-
-        # Force to return metadata (Schema)
         job.result()
-        schema_fields = job.schema
 
+        schema_fields = job.schema
         self.log.info(
             f"Schema fields found: {len(schema_fields) if schema_fields else 'None'}"
         )
 
-        if schema_fields is None:
+        if not schema_fields:
             raise ValueError(
                 "Could not infer schema from GCS. Check if files exist or format is correct."
             )
