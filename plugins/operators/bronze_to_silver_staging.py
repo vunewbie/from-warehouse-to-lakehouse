@@ -61,7 +61,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
         CLUSTER BY {", ".join(self.cluster_keys)}
         OPTIONS (
             table_format = 'ICEBERG',
-            uri = '{self.silver_staging_gcs_uri}'
+            table_uri = '{self.silver_staging_gcs_uri}'
         );
         """
         return create_ddl.strip()
