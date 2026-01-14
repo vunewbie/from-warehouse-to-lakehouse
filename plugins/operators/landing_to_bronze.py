@@ -90,7 +90,10 @@ class LandingToBronzeOperator(BaseOperator):
             "dryRun": True,
         }
         job = hook.insert_job(configuration=job_config, project_id=self.project_id)
-        new_schema = job["statistics"]["query"]["schema"]["fields"]
+        self.log.info(f"Job: {job}")
+        job_resource = job.to_api_repr()
+        self.log.info(f"Job resource: {job_resource}")
+        new_schema = job_resource["statistics"]["query"]["schema"]["fields"]
         self.log.info(f"Inferred new schema from GCS for {self.bronze_table_id}")
         return new_schema
 
