@@ -43,6 +43,9 @@ class LandingToBronzeOperator(BaseOperator):
         uris_sql = self._format_bq_string_array(self.bronze_external_uris)
         ddl = f"""
         CREATE OR REPLACE EXTERNAL TABLE `{self.bronze_table_id}`
+        WITH PARTITION COLUMNS (
+          date DATE
+        )
         OPTIONS (
           format = 'PARQUET',
           uris = {uris_sql},
