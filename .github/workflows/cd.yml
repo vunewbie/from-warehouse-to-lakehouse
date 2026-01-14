@@ -45,11 +45,11 @@ jobs:
 
       - name: Upload pyspark folder to GCS
         run: |
-          gsutil -m rsync -r -d pyspark/ gs://from-warehouse-to-lakehouse/pyspark
+          gsutil -m rsync -r -d pyspark/ gs://from-warehouse-to-lakehouse-bucket/pyspark
 
       - name: Verify upload
         run: |
-          gsutil ls gs://from-warehouse-to-lakehouse/pyspark/elt/workflows/source_to_landing.py
+          gsutil ls gs://from-warehouse-to-lakehouse-bucket/pyspark/elt/workflows/source_to_landing.py
 
   deploy-to-vm:
     runs-on: ubuntu-24.04
