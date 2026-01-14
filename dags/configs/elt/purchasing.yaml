@@ -1,0 +1,46 @@
+general:
+  dags_configs:
+    dag_type: elt
+    schedule_interval: "0 19 * * *"
+    max_active_runs: 3
+    catchup: false
+    dagrun_timeout: 600
+    owner: "vunewbie"
+    retries: 0
+
+  source_configs:
+    source_type: postgres
+    source_conn_id: adventureworks_purchasing
+    source_schema: purchasing
+
+  gcp_configs:
+    gcp_conn_id: gcp
+    gcs_bucket_name: from-warehouse-to-lakehouse-bucket
+    gcp_project_id: from-warehouse-to-lakehouse
+    gcp_location: asia-southeast1
+    dataproc_cluster_name: from-warehouse-to-lakehouse-cluster
+
+  default_table_configs:
+    is_disabled: false
+    look_back: 86400
+    primary_keys: [id]
+    clustered_by: [modified_date]
+    extract_conditions: 
+      - [modified_date, ">=", last_extracted_variable_key]
+    start_date: "20260113"
+
+entities:
+  - table_name: product_vendor
+    primary_keys: [product_id, business_entity_id]
+
+  - table_name: purchase_order_detail
+    primary_keys: [purchase_order_id, purchase_order_detail_id]
+
+  - table_name: purchase_order_header
+    primary_keys: [purchase_order_id]
+
+  - table_name: ship_method
+    primary_keys: [ship_method_id]
+
+  - table_name: vendor
+    primary_keys: [business_entity_id]

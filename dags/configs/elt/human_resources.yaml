@@ -1,0 +1,49 @@
+general:
+  dags_configs:
+    dag_type: elt
+    schedule_interval: "0 20 * * *"
+    max_active_runs: 3
+    catchup: false
+    dagrun_timeout: 600
+    owner: "vunewbie"
+    retries: 0
+
+  source_configs:
+    source_type: mysql
+    source_conn_id: adventureworks_human_resources
+    source_schema: human_resources
+
+  gcp_configs:
+    gcp_conn_id: gcp
+    gcs_bucket_name: from-warehouse-to-lakehouse-bucket
+    gcp_project_id: from-warehouse-to-lakehouse
+    gcp_location: asia-southeast1
+    dataproc_cluster_name: from-warehouse-to-lakehouse-cluster
+
+  default_table_configs:
+    is_disabled: false
+    look_back: 86400
+    primary_keys: [id]
+    clustered_by: [modified_date]
+    extract_conditions: 
+      - [modified_date, ">=", last_extracted_variable_key]
+    start_date: "20260113"
+
+entities:
+  - table_name: department
+    primary_keys: [department_id]
+
+  - table_name: employee
+    primary_keys: [business_entity_id]
+
+  - table_name: employee_department_history
+    primary_keys: [business_entity_id, department_id, shift_id, start_date]
+
+  - table_name: employee_pay_history
+    primary_keys: [business_entity_id, rate_change_date]
+
+  - table_name: job_candidate
+    primary_keys: [job_candidate_id]
+
+  - table_name: vw_shift
+    primary_keys: [shift_id]

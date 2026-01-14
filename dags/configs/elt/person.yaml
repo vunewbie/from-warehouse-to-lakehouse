@@ -1,0 +1,70 @@
+general:
+  dags_configs:
+    dag_type: elt
+    schedule_interval: "0 17 * * *"
+    max_active_runs: 3
+    catchup: false
+    dagrun_timeout: 600
+    owner: "vunewbie"
+    retries: 0
+
+  source_configs:
+    source_type: mysql
+    source_conn_id: adventureworks_person
+    source_schema: person
+
+  gcp_configs:
+    gcp_conn_id: gcp
+    gcs_bucket_name: from-warehouse-to-lakehouse-bucket
+    gcp_project_id: from-warehouse-to-lakehouse
+    gcp_location: asia-southeast1
+    dataproc_cluster_name: from-warehouse-to-lakehouse-cluster
+
+  default_table_configs:
+    is_disabled: false
+    look_back: 86400
+    primary_keys: [id]
+    clustered_by: [modified_date]
+    extract_conditions: 
+      - [modified_date, ">=", last_extracted_variable_key]
+    start_date: "20260113"
+
+entities:
+  - table_name: address
+    primary_keys: [address_id]
+
+  - table_name: address_type
+    primary_keys: [address_type_id]
+
+  - table_name: business_entity
+    primary_keys: [business_entity_id]
+
+  - table_name: business_entity_address
+    primary_keys: [business_entity_id, address_id, address_type_id]
+
+  - table_name: business_entity_contact
+    primary_keys: [business_entity_id, person_id, contact_type_id]
+
+  - table_name: contact_type
+    primary_keys: [contact_type_id]
+
+  - table_name: country_region
+    primary_keys: [country_region_code]
+
+  - table_name: email_address
+    primary_keys: [business_entity_id, email_address_id]
+
+  - table_name: password
+    primary_keys: [business_entity_id]
+
+  - table_name: person
+    primary_keys: [business_entity_id]
+
+  - table_name: person_phone
+    primary_keys: [business_entity_id, phone_number, phone_number_type_id]
+
+  - table_name: phone_number_type
+    primary_keys: [phone_number_type_id]
+
+  - table_name: state_province
+    primary_keys: [state_province_id]

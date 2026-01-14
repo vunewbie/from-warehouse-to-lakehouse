@@ -1,0 +1,88 @@
+general:
+  dags_configs:
+    dag_type: elt
+    schedule_interval: "0 16 * * *"
+    max_active_runs: 3
+    catchup: false
+    dagrun_timeout: 600
+    owner: "vunewbie"
+    retries: 0
+
+  source_configs:
+    source_type: postgres
+    source_conn_id: adventureworks_sales
+    source_schema: sales
+
+  gcp_configs:
+    gcp_conn_id: gcp
+    gcs_bucket_name: from-warehouse-to-lakehouse-bucket
+    gcp_project_id: from-warehouse-to-lakehouse
+    gcp_location: asia-southeast1
+    dataproc_cluster_name: from-warehouse-to-lakehouse-cluster
+
+  default_table_configs:
+    is_disabled: false
+    look_back: 86400
+    primary_keys: [id]
+    clustered_by: [modified_date]
+    extract_conditions: 
+      - [modified_date, ">=", last_extracted_variable_key]
+    start_date: "20260113"
+
+entities:
+  - table_name: country_region_currency
+    primary_keys: [country_region_code, currency_code]
+
+  - table_name: credit_card
+    primary_keys: [credit_card_id]
+
+  - table_name: currency
+    primary_keys: [currency_code]
+
+  - table_name: currency_rate
+    primary_keys: [currency_rate_id]
+
+  - table_name: customer
+    primary_keys: [customer_id]
+
+  - table_name: person_credit_card
+    primary_keys: [business_entity_id, credit_card_id]
+
+  - table_name: sales_order_detail
+    primary_keys: [sales_order_id, sales_order_detail_id]
+
+  - table_name: sales_order_header
+    primary_keys: [sales_order_id]
+
+  - table_name: sales_order_header_sales_reason
+    primary_keys: [sales_order_id, sales_reason_id]
+
+  - table_name: sales_person
+    primary_keys: [business_entity_id]
+
+  - table_name: sales_person_quota_history
+    primary_keys: [business_entity_id, quota_date]
+
+  - table_name: sales_reason
+    primary_keys: [sales_reason_id]
+
+  - table_name: sales_tax_rate
+    primary_keys: [sales_tax_rate_id]
+
+  - table_name: sales_territory
+    primary_keys: [territory_id]
+
+  - table_name: sales_territory_history
+    primary_keys: [business_entity_id, territory_id, start_date]
+
+  - table_name: shopping_cart_item
+    primary_keys: [shopping_cart_item_id]
+
+  - table_name: special_offer
+    primary_keys: [special_offer_id]
+
+  - table_name: special_offer_product
+    primary_keys: [special_offer_id, product_id]
+
+  - table_name: store
+    primary_keys: [business_entity_id]

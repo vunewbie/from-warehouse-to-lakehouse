@@ -1,0 +1,10 @@
+# Ignore secrets and local dbt artifacts
+dbt/*.json
+keys/
+dbt/logs/
+dbt/target/
+gcp-sa.json
+ssh_key.txt
+.env
+examples/
+.cursor/

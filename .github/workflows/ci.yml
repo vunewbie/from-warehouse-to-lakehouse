@@ -1,0 +1,129 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+
+jobs:
+  # Job 1: Code linting and formatting check
+  code-linting-and-formatting-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install black flake8 mypy pylint "pyspark==3.5.7"
+
+      - name: Run Black (format check)
+        run: |
+          black --check plugins/ dags/ pyspark/
+
+      - name: Run Flake8 (linting)
+        run: |
+          flake8 plugins/ dags/ pyspark/ --max-line-length=120 --extend-ignore=E203,W503
+
+      - name: Run Pylint
+        run: |
+          pylint plugins/ dags/ pyspark/ --errors-only --disable=import-error
+
+      - name: Validate PySpark files syntax
+        run: |
+          # Check syntax of PySpark files (they are not imported by DAGs, so need separate check)
+          echo "Checking PySpark files syntax..."
+          find pyspark -name "*.py" -type f | while read file; do
+            echo "Checking: $file"
+            python -m py_compile "$file" || (echo "Syntax error in $file" && exit 1)
+          done
+          echo "All PySpark files syntax check passed!"
+
+  # Job 2: Validate DAGs
+  validate-dags:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Airflow
+        run: |
+          pip install "apache-airflow==2.10.5" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+          pip install "apache-airflow-providers-google==12.0.0"
+          pip install "apache-airflow-providers-mysql==6.0.0"
+          pip install "apache-airflow-providers-postgres==6.0.0"
+          pip install "apache-airflow-providers-mongo==5.0.3"
+          pip install "pymongo==4.10.1"
+
+      - name: Validate DAGs
+        env:
+          AIRFLOW_HOME: /tmp/airflow
+          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+        run: |
+          mkdir -p $AIRFLOW_HOME
+
+          # Copy plugins and dags to AIRFLOW_HOME so Airflow can find them
+          cp -r plugins dags $AIRFLOW_HOME/
+          
+          # Set PYTHONPATH to include all plugin subdirectories
+          export PYTHONPATH="${{ github.workspace }}/plugins/generators:${{ github.workspace }}/plugins/models:${{ github.workspace }}/plugins/builders:${{ github.workspace }}/plugins/operators:${{ github.workspace }}/plugins/helpers:${{ github.workspace }}/plugins:${{ github.workspace }}"
+          
+          # Find airflow executable or use Python directly
+          AIRFLOW_CMD=$(python -c "import sys; from pathlib import Path; print(next(Path(p).parent / 'bin' / 'airflow' for p in sys.path if Path(p).parent / 'bin' / 'airflow' in Path(p).parent.glob('bin/airflow')), 'python -m airflow'))" 2>/dev/null || echo "python -m airflow")
+          $AIRFLOW_CMD db init || python -c "import airflow; airflow.cli.commands.db_command.initdb()" || echo "Database initialization skipped"
+          
+          # Set DAGs folder
+          export AIRFLOW__CORE__DAGS_FOLDER=${{ github.workspace }}/dags
+          
+          # Set plugins folder
+          export AIRFLOW__CORE__PLUGINS_FOLDER=$AIRFLOW_HOME/plugins
+          
+          # Validate DAGs - import DAG files directly to check for import errors
+          python -c "import sys; import os; dags_path = os.environ.get('AIRFLOW__CORE__DAGS_FOLDER', '${{ github.workspace }}/dags'); sys.path.insert(0, dags_path); sys.path.insert(0, '${{ github.workspace }}/plugins'); errors = []; exec('try:\\n    from root import elt\\n    print(\\'DAG elt.py imported successfully\\')\\nexcept Exception as e:\\n    errors.append(\\'elt.py: \\' + str(e))\\n    print(\\'Error importing elt.py: \\' + str(e))\\n\\ntry:\\n    from root import etl\\n    print(\\'DAG etl.py imported successfully\\')\\nexcept Exception as e:\\n    errors.append(\\'etl.py: \\' + str(e))\\n    print(\\'Error importing etl.py: \\' + str(e))\\n\\nif errors:\\n    print(\\'\\\\n Found \\' + str(len(errors)) + \\' import error(s)\\')\\n    sys.exit(1)\\nelse:\\n    print(\\'\\\\n All DAGs imported successfully!\\')')"
+
+  # Job 3: Build Docker image
+  build-airflow-image:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Airflow image (no push)
+        run: |
+          docker build -t vunewbie/airflow-ci:1.0.0 .
+          
+      - name: Test Docker image
+        run: |
+          docker run --rm vunewbie/airflow-ci:1.0.0 airflow version
+
+  # Job 4: Validate YAML configs
+  validate-configs:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: |
+          pip install pyyaml
+
+      - name: Validate YAML files
+        run: |
+          # Kiểm tra syntax YAML
+          python -c "import yaml, glob, os; [yaml.safe_load(open(f)) for f in glob.glob('dags/configs/**/*.yaml', recursive=True) if os.path.isfile(f)]"

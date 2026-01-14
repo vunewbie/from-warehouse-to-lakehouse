@@ -1,0 +1,26 @@
+adventureworks:
+  target: dev
+  outputs:
+    staging:
+      type: bigquery
+      method: service_account
+      keyfile: /opt/airflow/keys/gcp-sa.json
+      project: adventure-works-480103
+      dataset: "staging"
+      location: asia-southeast1
+      threads: 4
+      priority: interactive
+    core:
+      type: bigquery
+      method: service_account
+      keyfile: /opt/airflow/keys/gcp-sa.json
+      project: adventure-works-480103
+      dataset: "core"
+      location: asia-southeast1
+    mart:
+      type: bigquery
+      method: service_account
+      keyfile: /opt/airflow/keys/gcp-sa.json
+      project: adventure-works-480103
+      dataset: "mart"
+      location: asia-southeast1

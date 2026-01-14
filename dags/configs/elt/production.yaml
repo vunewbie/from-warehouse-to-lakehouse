@@ -1,0 +1,106 @@
+general:
+  dags_configs:
+    dag_type: elt
+    schedule_interval: "0 18 * * *"
+    max_active_runs: 3
+    catchup: false
+    dagrun_timeout: 600
+    owner: "vunewbie"
+    retries: 0
+
+  source_configs:
+    source_type: postgres
+    source_conn_id: adventureworks_production
+    source_schema: production
+
+  gcp_configs:
+    gcp_conn_id: gcp
+    gcs_bucket_name: from-warehouse-to-lakehouse-bucket
+    gcp_project_id: from-warehouse-to-lakehouse
+    gcp_location: asia-southeast1
+    dataproc_cluster_name: from-warehouse-to-lakehouse-cluster
+
+  default_table_configs:
+    is_disabled: false
+    look_back: 86400
+    primary_keys: [id]
+    clustered_by: [modified_date]
+    extract_conditions: 
+      - [modified_date, ">=", last_extracted_variable_key]
+    start_date: "20260113"
+
+entities:
+  - table_name: bill_of_materials
+    primary_keys: [bill_of_materials_id]
+
+  - table_name: culture
+    primary_keys: [culture_id]
+
+  - table_name: document
+    primary_keys: [document_node]
+
+  - table_name: illustration
+    primary_keys: [illustration_id]
+
+  - table_name: location
+    primary_keys: [location_id]
+
+  - table_name: product
+    primary_keys: [product_id]
+
+  - table_name: product_category
+    primary_keys: [product_category_id]
+
+  - table_name: product_cost_history
+    primary_keys: [product_id, start_date]
+
+  - table_name: product_description
+    primary_keys: [product_description_id]
+
+  - table_name: product_document
+    primary_keys: [product_id, document_node]
+
+  - table_name: product_inventory
+    primary_keys: [product_id, location_id, shelf, bin]
+
+  - table_name: product_list_price_history
+    primary_keys: [product_id, start_date]
+
+  - table_name: product_model
+    primary_keys: [product_model_id]
+
+  - table_name: product_model_illustration
+    primary_keys: [product_model_id, illustration_id]
+
+  - table_name: product_model_product_description_culture
+    primary_keys: [product_model_id, product_description_id, culture_id]
+
+  - table_name: product_photo
+    primary_keys: [product_photo_id]
+
+  - table_name: product_product_photo
+    primary_keys: [product_id, product_photo_id]
+
+  - table_name: product_review
+    primary_keys: [product_review_id]
+
+  - table_name: product_subcategory
+    primary_keys: [product_subcategory_id]
+
+  - table_name: scrap_reason
+    primary_keys: [scrap_reason_id]
+
+  - table_name: transaction_history
+    primary_keys: [transaction_id]
+
+  - table_name: transaction_history_archive
+    primary_keys: [transaction_id]
+
+  - table_name: unit_measure
+    primary_keys: [unit_measure_code]
+
+  - table_name: work_order
+    primary_keys: [work_order_id]
+
+  - table_name: work_order_routing
+    primary_keys: [work_order_id, product_id, operation_sequence]
