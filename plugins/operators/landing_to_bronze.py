@@ -98,6 +98,7 @@ class LandingToBronzeOperator(BaseOperator):
             "dryRun": True,
         }
 
+        self.log.info(f"Job config: {job_config}")
         self.log.info("Submitting Dry Run Load Job to infer schema...")
 
         job = hook.insert_job(configuration=job_config, project_id=self.project_id)
