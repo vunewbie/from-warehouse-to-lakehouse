@@ -93,7 +93,10 @@ class LandingToBronzeOperator(BaseOperator):
         self.log.info(f"Job: {job}")
         job_resource = job.to_api_repr()
         self.log.info(f"Job resource: {job_resource}")
-        new_schema = job_resource["statistics"]["query"]["schema"]["fields"]
+        schema_fields = job.schema
+        self.log.info(f"Job.schema: {schema_fields}")
+
+        new_schema = [field.to_api_repr() for field in schema_fields]
         self.log.info(f"Inferred new schema from GCS for {self.bronze_table_id}")
         return new_schema
 
