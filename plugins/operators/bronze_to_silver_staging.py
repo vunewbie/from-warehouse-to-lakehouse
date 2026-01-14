@@ -90,7 +90,15 @@ class BronzeToSilverStagingOperator(BaseOperator):
             create_ddl = self._build_create_iceberg_table_ddl(bronze_schema)
 
             self.log.info("Executing CREATE TABLE DDL for Iceberg table...")
-            hook.run_query(sql=create_ddl, use_legacy_sql=False)
+            hook.insert_job(
+                configuration={
+                    "query": {
+                        "query": create_ddl,
+                        "useLegacySql": False,
+                    }
+                },
+                project_id=self.project_id,
+            )
             self.log.info(
                 f"Successfully created Iceberg table: {self.silver_staging_table_id}"
             )
@@ -184,7 +192,15 @@ class BronzeToSilverStagingOperator(BaseOperator):
         merge_sql = self._build_merge_sql(bronze_schema)
 
         self.log.info("Executing MERGE statement into Silver Staging table...")
-        hook.run_query(sql=merge_sql, use_legacy_sql=False)
+        hook.insert_job(
+            configuration={
+                "query": {
+                    "query": merge_sql,
+                    "useLegacySql": False,
+                }
+            },
+            project_id=self.project_id,
+        )
         self.log.info("MERGE operation completed successfully.")
 
     def execute(self, context):

@@ -56,7 +56,15 @@ class LandingToBronzeOperator(BaseOperator):
 
         ddl = self._build_create_external_table_ddl()
         self.log.info("Executing DDL to create/replace external table...")
-        hook.run_query(sql=ddl, use_legacy_sql=False)
+        hook.insert_job(
+            configuration={
+                "query": {
+                    "query": ddl,
+                    "useLegacySql": False,
+                }
+            },
+            project_id=self.project_id,
+        )
         self.log.info(
             f"External table {self.bronze_table_id} created/replaced successfully."
         )
