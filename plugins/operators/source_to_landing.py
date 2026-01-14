@@ -174,19 +174,18 @@ class SourceToLandingOperator(BaseOperator):
 
         dataproc_hook = DataprocHook(gcp_conn_id=self.gcp_conn_id)
         self.log.info("Submitting Dataproc job to existing cluster...")
-        operation = dataproc_hook.submit_job(
+        submitted_job = dataproc_hook.submit_job(
             project_id=self.project_id,
             region=self.region,
             job=job,
         )
+        job_id = submitted_job.reference.job_id
 
+        self.log.info(f"Job submitted successfully. Job ID: {job_id}")
         self.log.info("Waiting for Dataproc job to complete...")
 
-        if hasattr(operation, "result"):
-            operation.result(timeout=360)
-            self.log.info("Dataproc job completed successfully.")
-            return
-
-        self.log.warning(
-            "Dataproc submit_job() did not return a waitable operation; cannot block until completion."
+        dataproc_hook.wait_for_job(
+            job_id=job_id, project_id=self.project_id, region=self.region, timeout=3600
         )
+
+        self.log.info("Dataproc job completed successfully.")
