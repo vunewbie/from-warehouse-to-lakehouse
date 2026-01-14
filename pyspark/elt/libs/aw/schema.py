@@ -144,7 +144,6 @@ def get_source_columns_info(
         (SELECT
             COLUMN_NAME,
             DATA_TYPE,
-            IS_NULLABLE,
             NUMERIC_PRECISION,
             NUMERIC_SCALE
         FROM INFORMATION_SCHEMA.COLUMNS
@@ -166,7 +165,6 @@ def get_source_columns_info(
         {
             "name": row["COLUMN_NAME"],
             "data_type": row["DATA_TYPE"],
-            "is_nullable": row["IS_NULLABLE"],
             "numeric_precision": row["NUMERIC_PRECISION"],
             "numeric_scale": row["NUMERIC_SCALE"],
         }
@@ -175,27 +173,25 @@ def get_source_columns_info(
 
 
 def build_spark_schema(columns_info: list, source_type: str) -> StructType:
-    """Build Spark StructType schema from source columns_info."""
+    """Build Spark StructType schema from source columns_info.
+
+    Note: All fields are set to nullable=True to avoid schema mismatch with JDBC driver.
+    """
     fields = []
     for col in columns_info:
         col_name = col["name"]
         data_type = col["data_type"]
-        is_nullable = col["is_nullable"] == "YES"
-        numeric_precision = col["numeric_precision"]
-        numeric_scale = col["numeric_scale"]
 
         spark_type_name = convert_source_type_to_spark(data_type, source_type)
 
         if spark_type_name == "DecimalType":
-            precision = numeric_precision if numeric_precision else 38
-            scale = numeric_scale if numeric_scale else 18
+            precision = col.get("numeric_precision") or 38
+            scale = col.get("numeric_scale") or 18
             spark_type = DecimalType(precision, scale)
         else:
             spark_type_class = convert_spark_type(spark_type_name)
             spark_type = spark_type_class()
 
-        fields.append(StructField(col_name, spark_type, nullable=is_nullable))
-
-    fields.append(StructField("_extract_date_", TimestampType(), nullable=True))
+        fields.append(StructField(col_name, spark_type, nullable=True))
 
     return StructType(fields)
