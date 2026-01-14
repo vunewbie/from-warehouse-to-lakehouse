@@ -100,25 +100,28 @@ class LandingToBronzeOperator(BaseOperator):
 
         self.log.info(f"Job config: {job_config}")
         self.log.info("Submitting Dry Run Load Job to infer schema...")
-
         job = hook.insert_job(configuration=job_config, project_id=self.project_id)
-
+        
+        # 1. Bắt buộc gọi result() để chờ server trả về kết quả
         job.result()
 
-        schema_fields = job.schema
-        self.log.info(
-            f"Schema fields found: {len(schema_fields) if schema_fields else 'None'}"
-        )
+        # 2. Lấy toàn bộ thông tin Job dưới dạng Dictionary
+        job_resource = job.to_api_repr()
+        self.log.info(f"Job resource: {job_resource}")
+        
+        # 3. Truy cập vào đường dẫn chứa Schema autodetect
+        # Cấu trúc: statistics -> load -> schema -> fields
+        try:
+            schema_fields = job_resource['statistics']['load']['schema']['fields']
+        except KeyError:
+            # Phòng trường hợp không detect được
+            self.log.error(f"Full Job Resource for debugging: {job_resource}")
+            raise ValueError("BigQuery could not autodetect schema. Check if file is valid Parquet.")
 
-        if not schema_fields:
-            raise ValueError(
-                "Could not infer schema from GCS. Check if files exist or format is correct."
-            )
-
-        new_schema = [field.to_api_repr() for field in schema_fields]
-
-        self.log.info(f"Inferred new schema from GCS for {self.bronze_table_id}")
-        return new_schema
+        self.log.info(f"Schema fields found: {len(schema_fields)}")
+        
+        # Schema này đã là dạng List of Dicts (JSON), không cần convert .to_api_repr() nữa
+        return schema_fields
 
     def _send_schema_notification(self, old_schema, new_schema):
         notification_email = Variable.get("de_notification_email", default_var=None)
