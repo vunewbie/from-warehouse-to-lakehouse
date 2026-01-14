@@ -89,14 +89,26 @@ class LandingToBronzeOperator(BaseOperator):
             "externalDataConfiguration": external_config,
             "dryRun": True,
         }
+
         job = hook.insert_job(configuration=job_config, project_id=self.project_id)
-        self.log.info(f"Job: {job}")
-        job_resource = job.to_api_repr()
-        self.log.info(f"Job resource: {job_resource}")
+
+        self.log.info(f"Job submitted: {job.job_id}")
+
+        # Force to return metadata (Schema)
+        job.result()
         schema_fields = job.schema
-        self.log.info(f"Job.schema: {schema_fields}")
+
+        self.log.info(
+            f"Schema fields found: {len(schema_fields) if schema_fields else 'None'}"
+        )
+
+        if schema_fields is None:
+            raise ValueError(
+                "Could not infer schema from GCS. Check if files exist or format is correct."
+            )
 
         new_schema = [field.to_api_repr() for field in schema_fields]
+
         self.log.info(f"Inferred new schema from GCS for {self.bronze_table_id}")
         return new_schema
 
