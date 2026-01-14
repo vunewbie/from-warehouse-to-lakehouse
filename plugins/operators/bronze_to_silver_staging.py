@@ -8,7 +8,7 @@ from google.cloud.exceptions import NotFound
 
 
 class BronzeToSilverStagingOperator(BaseOperator):
-    """Upsert data from a Bronze external table to a Silver Staging Iceberg table.
+    """Upsert data from a Bronze external table to a Silver Staging partitioned table.
     Creates the table if it doesn't exist.
     """
 
@@ -47,8 +47,8 @@ class BronzeToSilverStagingOperator(BaseOperator):
         )
         return bronze_schema
 
-    def _build_create_iceberg_table_ddl(self, bronze_schema):
-        """Builds the CREATE TABLE DDL statement for Iceberg table."""
+    def _build_create_partitioned_table_ddl(self, bronze_schema):
+        """Builds the CREATE TABLE DDL statement for partitioned table."""
         columns_ddl = ",\n".join(
             [f"`{field['name']}` {field['type']}" for field in bronze_schema["fields"]]
         )
@@ -59,15 +59,11 @@ class BronzeToSilverStagingOperator(BaseOperator):
         )
         PARTITION BY DATE(_extract_date_)
         CLUSTER BY {", ".join(self.cluster_keys)}
-        OPTIONS (
-            table_format = 'ICEBERG',
-            table_uri = '{self.silver_staging_gcs_uri}'
-        );
         """
         return create_ddl.strip()
 
     def _create_silver_staging_table_if_not_exists(self, hook):
-        """Creates the Silver Staging Iceberg table if it doesn't exist."""
+        """Creates the Silver Staging table if it doesn't exist."""
         silver_dataset_id, silver_table_name = self.silver_staging_table_id.split(".")[
             -2:
         ]
@@ -87,9 +83,9 @@ class BronzeToSilverStagingOperator(BaseOperator):
             )
 
             bronze_schema = self._get_bronze_schema(hook)
-            create_ddl = self._build_create_iceberg_table_ddl(bronze_schema)
+            create_ddl = self._build_create_partitioned_table_ddl(bronze_schema)
 
-            self.log.info("Executing CREATE TABLE DDL for Iceberg table...")
+            self.log.info("Executing CREATE TABLE DDL for partitioned table...")
             hook.insert_job(
                 configuration={
                     "query": {
@@ -99,9 +95,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
                 },
                 project_id=self.project_id,
             )
-            self.log.info(
-                f"Successfully created Iceberg table: {self.silver_staging_table_id}"
-            )
+            self.log.info(f"Successfully created table: {self.silver_staging_table_id}")
 
     def _build_merge_sql(self, bronze_schema):
         """Builds the MERGE SQL statement to deduplicate and upsert data with date_list optimization."""
