@@ -81,7 +81,7 @@ class ELTBuilder(BaseBuilder):
     def bronze_external_uris(self):
         return [
             f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-            f"{self.model.source_schema}/{self.model.table_name}/date=*/*.parquet"
+            f"{self.model.source_schema}/{self.model.table_name}/*.parquet"
         ]
 
     @property
