@@ -43,6 +43,11 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Build aw.zip for PySpark dependencies
+        run: |
+          rm -f pyspark/elt/libs/aw.zip
+          (cd pyspark/elt/libs && zip -r aw.zip aw)
+
       - name: Upload pyspark folder to GCS
         run: |
           gsutil -m rsync -r -d pyspark/ gs://from-warehouse-to-lakehouse-bucket/pyspark
@@ -50,6 +55,7 @@ jobs:
       - name: Verify upload
         run: |
           gsutil ls gs://from-warehouse-to-lakehouse-bucket/pyspark/elt/workflows/source_to_landing.py
+          gsutil ls gs://from-warehouse-to-lakehouse-bucket/pyspark/elt/libs/aw.zip
 
   deploy-to-vm:
     runs-on: ubuntu-24.04
