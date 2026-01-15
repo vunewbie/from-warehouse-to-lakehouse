@@ -111,9 +111,9 @@ class BronzeToSilverStagingOperator(BaseOperator):
             [f"T.`{pk}` = S.`{pk}`" for pk in self.primary_keys]
         )
 
-        # Build extract condition: filter data from last 2 hours to handle late-arriving data
+        # Build extract condition: filter data from last 1 day to handle late-arriving data
         extract_condition_stm = (
-            "_extract_date_ >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR)"
+            "_extract_date_ >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
         )
 
         # Build date_list optimization if cluster_keys exist
