@@ -1,5 +1,3 @@
-# vunewbie-data-engineering/plugins/operators/bronze_to_silver_staging.py
-
 from typing import Sequence
 
 from airflow.models.baseoperator import BaseOperator

@@ -1,5 +1,3 @@
-# vunewbie-data-engineering/plugins/operators/source_to_landing.py
-
 from typing import Sequence
 
 from airflow.models.baseoperator import BaseOperator
@@ -171,9 +169,10 @@ class SourceToLandingOperator(BaseOperator):
 
         jdbc_info = self._get_jdbc_connection_info()
         job = self._build_dataproc_job(query=query, jdbc_info=jdbc_info)
-
         dataproc_hook = DataprocHook(gcp_conn_id=self.gcp_conn_id)
+
         self.log.info("Submitting Dataproc job to existing cluster...")
+
         submitted_job = dataproc_hook.submit_job(
             project_id=self.project_id,
             region=self.region,

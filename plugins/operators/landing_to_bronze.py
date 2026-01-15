@@ -1,5 +1,3 @@
-# vunewbie-data-engineering/plugins/operators/landing_to_bronze.py
-
 import json
 from typing import Sequence, Optional, List, Dict
 
@@ -94,12 +92,9 @@ class LandingToBronzeOperator(BaseOperator):
                 project_id=self.project_id,
             )
             job.result()  # Wait for job to complete
-
             schema = []
-            try:
-                # Try pandas DataFrame approach
-                import pandas as pd
 
+            try:
                 df = job.to_dataframe()
                 if df.empty:
                     self.log.info(
@@ -108,7 +103,6 @@ class LandingToBronzeOperator(BaseOperator):
                     return None
                 schema = df.to_dict("records")
             except (AttributeError, ImportError):
-                # Fallback: iterate through rows
                 for row in job:
                     schema.append(
                         {
@@ -247,11 +241,9 @@ class LandingToBronzeOperator(BaseOperator):
     def execute(self, context):
         hook = BigQueryHook(gcp_conn_id=self.gcp_conn_id, location=self.location)
 
-        # Step 1: Get old schema
-        self.log.info("Step 1: Retrieving old schema from INFORMATION_SCHEMA...")
+        self.log.info("Retrieving old schema from INFORMATION_SCHEMA...")
         old_schema = self._get_old_schema(hook)
 
-        # Step 2: Execute CREATE OR REPLACE EXTERNAL TABLE
         ddl = self._build_create_external_table_ddl()
         self.log.info("Step 2: Executing DDL to create/replace external table...")
         hook.insert_job(
@@ -267,21 +259,17 @@ class LandingToBronzeOperator(BaseOperator):
             f"External table {self.bronze_table_id} created/replaced successfully."
         )
 
-        # Step 3: Get new schema
-        self.log.info("Step 3: Retrieving new schema from INFORMATION_SCHEMA...")
+        self.log.info("Retrieving new schema from INFORMATION_SCHEMA...")
         new_schema = self._get_new_schema(hook)
 
-        # Step 4: Compare schemas and send notification if changed
-        self.log.info("Step 4: Comparing schemas...")
+        self.log.info("Comparing schemas...")
         comparison_result = self._compare_schemas(old_schema, new_schema)
         self.log.info(
             f"Schema comparison result:\n{json.dumps(comparison_result, indent=2)}"
         )
 
-        # Log current schema
         self.log.info(
             f"Current schema for {self.bronze_table_id}:\n{json.dumps(new_schema, indent=2)}"
         )
 
-        # Send notification if schema changed
         self._send_schema_notification(comparison_result, context)

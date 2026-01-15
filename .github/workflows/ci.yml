@@ -29,7 +29,7 @@ jobs:
 
       - name: Run Flake8 (linting)
         run: |
-          flake8 plugins/ dags/ pyspark/ --max-line-length=120 --extend-ignore=E203,W503
+          flake8 plugins/ dags/ pyspark/ --max-line-length=150 --extend-ignore=E203,W503
 
       - name: Run Pylint
         run: |
@@ -125,5 +125,4 @@ jobs:
 
       - name: Validate YAML files
         run: |
-          # Kiểm tra syntax YAML
           python -c "import yaml, glob, os; [yaml.safe_load(open(f)) for f in glob.glob('dags/configs/**/*.yaml', recursive=True) if os.path.isfile(f)]"

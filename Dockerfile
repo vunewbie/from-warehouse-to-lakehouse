@@ -14,9 +14,5 @@ USER airflow
 RUN pip install --upgrade pip
 
 RUN pip install --no-cache-dir \
-    dbt-core==1.10.15 \
-    dbt-bigquery==1.10.3
-
-RUN pip install --no-cache-dir \
     apache-airflow-providers-mongo==5.0.3 \
     pymongo==4.10.1

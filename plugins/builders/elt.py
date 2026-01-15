@@ -4,8 +4,13 @@ from operators.landing_to_bronze import LandingToBronzeOperator
 
 from builders.base import BaseBuilder
 
+from airflow.models import Variable
+from airflow.operators.python import PythonOperator
+from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+
 
 class ELTBuilder(BaseBuilder):
+    # General configs
     @property
     def dag_id(self):
         return "__".join(
@@ -23,7 +28,7 @@ class ELTBuilder(BaseBuilder):
             self.model.source_type,
             self.model.source_schema,
             self.model.table_name,
-            "source_to_silver",
+            "source_to_silver_staging",
         ]
 
     @property
@@ -105,18 +110,13 @@ class ELTBuilder(BaseBuilder):
     # Bronze to Silver staging
     @property
     def silver_staging_table_id(self):
-        """ID of the Silver Staging table, e.g., `project.silver_staging.schema__table`"""
         return f"{self.gcp_project_id}.silver_staging.{self.model.source_schema}__{self.model.table_name}"
 
     @property
     def silver_staging_gcs_uri(self):
-        """GCS path where the Iceberg table will store its data and metadata."""
         return f"gs://{self.gcs_bucket_name}/silver_staging/{self.model.source_schema}/{self.model.table_name}"
 
     def _get_bronze_to_silver_staging_task(self):
-        """
-        Initializes the BronzeToSilverStagingOperator.
-        """
         return BronzeToSilverStagingOperator(
             task_id="bronze_to_silver_staging",
             gcp_conn_id=self.gcp_conn_id,
@@ -127,4 +127,62 @@ class ELTBuilder(BaseBuilder):
             silver_staging_gcs_uri=self.silver_staging_gcs_uri,
             primary_keys=self.model.primary_keys,
             cluster_keys=self.model.clustered_by,
+        )
+
+    def _set_last_extracted_variable(self):
+        if self.is_extracted_full:
+            return None
+
+        if not self.model.clustered_by or len(self.model.clustered_by) == 0:
+            raise ValueError(
+                f"clustered_by must be provided to compute watermark for {self.dag_id}"
+            )
+
+        # Use the max() of clustered_by fields as requested
+        watermark_column = max(self.model.clustered_by)
+
+        def _set_var(**context):
+            hook = BigQueryHook(
+                gcp_conn_id=self.gcp_conn_id, location=self.gcp_location
+            )
+
+            query = f"""
+            SELECT
+              FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S',
+                TIMESTAMP_SUB(CAST(MAX(`{watermark_column}`) AS TIMESTAMP), INTERVAL 1 DAY)
+              ) AS watermark
+            FROM `{self.silver_staging_table_id}`
+            """.strip()
+
+            job = hook.insert_job(
+                configuration={
+                    "query": {
+                        "query": query,
+                        "useLegacySql": False,
+                    }
+                },
+                project_id=self.gcp_project_id,
+            )
+            job.result()
+
+            watermark_value = None
+            for row in job:
+                watermark_value = row.get("watermark")
+                break
+
+            if not watermark_value:
+                self.log.warning(
+                    f"No watermark could be computed from {self.silver_staging_table_id}. Skipping last_extraction update."
+                )
+                return
+
+            dag_id = context["dag"].dag_id
+            Variable.set(f"{dag_id}__last_extraction", watermark_value)
+            self.log.info(
+                f"Set {dag_id}__last_extraction = {watermark_value} (MAX({watermark_column}) - 1 day from {self.silver_staging_table_id})"
+            )
+
+        return PythonOperator(
+            task_id="set_last_extracted_variable",
+            python_callable=_set_var,
         )

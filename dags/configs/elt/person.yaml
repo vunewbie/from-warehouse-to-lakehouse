@@ -1,7 +1,7 @@
 general:
   dags_configs:
     dag_type: elt
-    schedule_interval: "0 17 * * *"
+    schedule_interval: "20 17 * * *"
     max_active_runs: 3
     catchup: false
     dagrun_timeout: 600
@@ -27,7 +27,7 @@ general:
     clustered_by: [modified_date]
     extract_conditions: 
       - [modified_date, ">=", last_extracted_variable_key]
-    start_date: "20260113"
+    start_date: "20260115"
 
 entities:
   - table_name: address
