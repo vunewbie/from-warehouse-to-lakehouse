@@ -44,7 +44,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
         )
 
         try:
-        bronze_dataset_id, bronze_table_name = self.bronze_table_id.split(".")[-2:]
+            bronze_dataset_id, bronze_table_name = self.bronze_table_id.split(".")[-2:]
         except ValueError:
             raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
 
