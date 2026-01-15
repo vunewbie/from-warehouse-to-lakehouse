@@ -64,7 +64,7 @@ class LandingToBronzeOperator(BaseOperator):
             return dataset_id, table_name
         raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
 
-    def _get_schema_from_information_schema(self, hook) -> Optional[List[Dict]]:
+    def _get_schema_from_information_schema(self, hook):
         dataset_id, table_name = self._parse_table_id()
         self.log.info(
             f"Querying INFORMATION_SCHEMA for table {self.bronze_table_id}..."
@@ -88,11 +88,11 @@ class LandingToBronzeOperator(BaseOperator):
             self.log.warning(f"Error querying INFORMATION_SCHEMA: {e}")
             return None
 
-    def _get_old_schema(self, hook) -> Optional[List[Dict]]:
+    def _get_old_schema(self, hook):
         """Get old schema before CREATE OR REPLACE."""
         return self._get_schema_from_information_schema(hook)
 
-    def _get_new_schema(self, hook) -> List[Dict]:
+    def _get_new_schema(self, hook):
         """Get new schema after CREATE OR REPLACE."""
         schema = self._get_schema_from_information_schema(hook)
         if schema is None:
@@ -102,8 +102,8 @@ class LandingToBronzeOperator(BaseOperator):
         return schema
 
     def _compare_schemas(
-        self, old_schema: Optional[List[Dict]], new_schema: List[Dict]
-    ) -> Dict:
+        self, old_schema, new_schema
+    ):
         """Compare old and new schemas to detect changes."""
         if old_schema is None:
             return {
@@ -140,7 +140,7 @@ class LandingToBronzeOperator(BaseOperator):
             "modified_columns": modified_columns,
         }
 
-    def _send_schema_notification(self, comparison_result: Dict, context):
+    def _send_schema_notification(self, comparison_result, context):
         """Send email notification if schema has changed."""
         notification_email = Variable.get("de_notification_email", default_var=None)
         if not notification_email:

@@ -125,7 +125,7 @@ BASE_SPARK_TYPES = {
 }
 
 
-def normalize_base_type(data_type: str) -> str:
+def normalize_base_type(data_type):
     """Normalize data type string to base type name."""
     base = data_type
     pos = base.find("(")
@@ -134,7 +134,7 @@ def normalize_base_type(data_type: str) -> str:
     return base.lower().strip()
 
 
-def convert_source_type_to_spark(data_type: str, source_type: str) -> str:
+def convert_source_type_to_spark(data_type, source_type):
     """Convert source database type to Spark type name."""
     data_type = normalize_base_type(data_type)
     if source_type == "mysql":
@@ -145,20 +145,20 @@ def convert_source_type_to_spark(data_type: str, source_type: str) -> str:
         raise NotImplementedError(f"Not implemented for source type: {source_type}")
 
 
-def convert_spark_type(spark_type_name: str):
+def convert_spark_type(spark_type_name):
     """Get Spark type class from type name."""
     return BASE_SPARK_TYPES.get(spark_type_name, StringType)
 
 
 def get_source_columns_info(
     spark: SparkSession,
-    jdbc_url: str,
-    jdbc_driver: str,
-    user: str,
-    password: str,
-    schema: str,
-    table: str,
-) -> list:
+    jdbc_url,
+    jdbc_driver,
+    user,
+    password,
+    schema,
+    table,
+):
     """Query INFORMATION_SCHEMA from JDBC source to get table schema."""
     query = f"""
         (SELECT
@@ -181,18 +181,21 @@ def get_source_columns_info(
         .load()
     )
 
+    # Normalize column names to lowercase(postgres)
+    df_lower = df.toDF(*[c.lower() for c in df.columns])
+
     return [
         {
-            "name": row["COLUMN_NAME"],
-            "data_type": row["DATA_TYPE"],
-            "numeric_precision": row["NUMERIC_PRECISION"],
-            "numeric_scale": row["NUMERIC_SCALE"],
+            "name": row["column_name"],
+            "data_type": row["data_type"],
+            "numeric_precision": row["numeric_precision"],
+            "numeric_scale": row["numeric_scale"],
         }
-        for row in df.collect()
+        for row in df_lower.collect()
     ]
 
 
-def build_spark_schema(columns_info: list, source_type: str) -> StructType:
+def build_spark_schema(columns_info, source_type):
     """Build Spark StructType schema from source columns_info.
 
     Note: All fields are set to nullable=True to avoid schema mismatch with JDBC driver.
