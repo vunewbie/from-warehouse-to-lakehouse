@@ -23,7 +23,7 @@ MYSQL_TO_SPARK_DATA_TYPE = {
     # --- Numeric Types ---
     "bit": "BooleanType",         
     "tinyint": "ByteType",        
-    "smallint": "ShortType",      
+    "smallint": "IntegerType",      
     "mediumint": "IntegerType",   
     "int": "IntegerType",         
     "integer": "IntegerType",     
