@@ -1,6 +1,4 @@
-"""Utility functions for Airflow DAGs."""
-
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from airflow.utils.email import send_email
 from airflow.models import Variable
@@ -28,12 +26,12 @@ def task_failure_alert_email(context):
 
 def fetch_information_schema_columns(
     hook,
-    project_id: str,
-    dataset_id: str,
-    table_name: str,
-    select_mode: str = "full",
-    table_schema_filter: Optional[str] = None,
-) -> Optional[List[Dict]]:
+    project_id,
+    dataset_id,
+    table_name,
+    select_mode="full",
+    table_schema_filter=None,
+):
     if select_mode == "full":
         select_clause = """
           table_catalog,

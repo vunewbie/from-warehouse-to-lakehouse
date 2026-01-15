@@ -39,14 +39,14 @@ class ELTBuilder(BaseBuilder):
                 self.model.dag_type,
                 self.model.source_database,
                 self.model.table_name,
-                "source_to_silver_staging",
+                self.model.source_type,
             ]
         elif self.model.source_type == "postgres":
             return [
                 self.model.dag_type,
                 self.model.source_schema,
                 self.model.table_name,
-                "source_to_silver_staging",
+                self.model.source_type,
             ]
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
@@ -89,8 +89,10 @@ class ELTBuilder(BaseBuilder):
     def _get_source_to_landing_task(self):
         if self.model.source_type == "mysql":
             jdbc_schema_or_database = self.model.source_database
+
         elif self.model.source_type == "postgres":
             jdbc_schema_or_database = self.model.source_schema
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -131,13 +133,11 @@ class ELTBuilder(BaseBuilder):
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_database}/{self.model.table_name}/*.parquet"
             ]
-
         elif self.model.source_type == "postgres":
             return [
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_schema}/{self.model.table_name}/*.parquet"
             ]
-
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -148,13 +148,11 @@ class ELTBuilder(BaseBuilder):
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_database}/{self.model.table_name}/"
             )
-
         elif self.model.source_type == "postgres":
             return (
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_schema}/{self.model.table_name}/"
             )
-
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
