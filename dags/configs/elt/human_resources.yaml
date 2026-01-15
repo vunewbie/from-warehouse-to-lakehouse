@@ -11,7 +11,7 @@ general:
   source_configs:
     source_type: mysql
     source_conn_id: adventureworks_human_resources
-    source_schema: human_resources
+    source_database: human_resources
 
   gcp_configs:
     gcp_conn_id: gcp

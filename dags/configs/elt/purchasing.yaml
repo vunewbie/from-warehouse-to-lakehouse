@@ -11,6 +11,7 @@ general:
   source_configs:
     source_type: postgres
     source_conn_id: adventureworks_purchasing
+    source_database: defaultdb
     source_schema: purchasing
 
   gcp_configs:

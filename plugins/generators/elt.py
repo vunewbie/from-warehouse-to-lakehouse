@@ -35,6 +35,7 @@ class ELTGenerator(BaseGenerator):
             # Source configs
             "source_type": source_configs.get("source_type"),
             "source_conn_id": source_configs.get("source_conn_id"),
+            "source_database": source_configs.get("source_database"),
             "source_schema": source_configs.get("source_schema"),
             # GCP configs
             "gcp_conn_id": gcp_configs.get("gcp_conn_id"),

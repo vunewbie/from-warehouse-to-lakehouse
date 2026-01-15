@@ -25,8 +25,7 @@ def parse_args():
     p.add_argument("--jdbc_user", required=True)
     p.add_argument("--jdbc_password", required=True)
 
-    # schema in the database (e.g. human_resources, sales)
-    p.add_argument("--jdbc_schema", required=True)
+    p.add_argument("--jdbc_schema_or_database", required=True)
     p.add_argument("--table_name", required=True)
 
     # query built by Airflow builder
@@ -55,7 +54,7 @@ def main():
         jdbc_driver=args.jdbc_driver,
         user=args.jdbc_user,
         password=args.jdbc_password,
-        schema=args.jdbc_schema,
+        schema=args.jdbc_schema_or_database,
         table=args.table_name,
     )
 

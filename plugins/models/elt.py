@@ -8,7 +8,8 @@ from datetime import timedelta, datetime
 class SourceConfigs:
     source_type: str = attr.ib(kw_only=True)
     source_conn_id: str = attr.ib(kw_only=True)
-    source_schema: str = attr.ib(kw_only=True)
+    source_database: str = attr.ib(kw_only=True)
+    source_schema: str = attr.ib(kw_only=True, default=None)
 
 
 @attr.s

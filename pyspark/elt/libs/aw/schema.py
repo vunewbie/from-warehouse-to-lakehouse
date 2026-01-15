@@ -162,14 +162,14 @@ def get_source_columns_info(
     """Query INFORMATION_SCHEMA from JDBC source to get table schema."""
     query = f"""
         (SELECT
-            COLUMN_NAME,
-            DATA_TYPE,
-            NUMERIC_PRECISION,
-            NUMERIC_SCALE
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = '{schema}'
-        AND TABLE_NAME = '{table}'
-        ORDER BY ORDINAL_POSITION) AS schema_info
+            column_name,
+            data_type,
+            numeric_precision,
+            numeric_scale
+        FROM information_schema.columns
+        WHERE table_schema = '{schema}'
+        AND table_name = '{table}'
+        ORDER BY ordinal_position) AS schema_info
     """
     df = (
         spark.read.format("jdbc")

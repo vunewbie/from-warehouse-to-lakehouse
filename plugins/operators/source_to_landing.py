@@ -23,7 +23,7 @@ class SourceToLandingOperator(BaseOperator):
         cluster_name,
         source_type,
         source_conn_id,
-        jdbc_schema,
+        jdbc_schema_or_database,
         table_name,
         gcs_bucket_name,
         dag_type,
@@ -41,7 +41,7 @@ class SourceToLandingOperator(BaseOperator):
         self.cluster_name = cluster_name
         self.source_type = source_type
         self.source_conn_id = source_conn_id
-        self.jdbc_schema = jdbc_schema
+        self.jdbc_schema_or_database = jdbc_schema_or_database
         self.table_name = table_name
         self.gcs_bucket_name = gcs_bucket_name
         self.dag_type = dag_type
@@ -67,7 +67,7 @@ class SourceToLandingOperator(BaseOperator):
 
     def _build_extract_query(self):
         select_statement = "SELECT *\n"
-        from_statement = f"FROM {self.jdbc_schema}.{self.table_name}\n"
+        from_statement = f"FROM {self.jdbc_schema_or_database}.{self.table_name}\n"
 
         is_extracted_full = (
             self.extract_conditions is None or len(self.extract_conditions) == 0
@@ -111,9 +111,12 @@ class SourceToLandingOperator(BaseOperator):
         password = conn.password
 
         if self.source_type == "mysql":
-            jdbc_url = f"jdbc:mysql://{conn.host}:{port}/{database}"
-        else:
+            jdbc_url = f"jdbc:mysql://{conn.host}:{port}/{self.jdbc_schema_or_database}"
+        elif self.source_type == "postgres":
+            # For Postgres, the database is in the connection's schema field
             jdbc_url = f"jdbc:postgresql://{conn.host}:{port}/{database}"
+        else:
+            raise ValueError(f"Unsupported source_type: {self.source_type}")
 
         return {
             "jdbc_driver": jdbc_driver,
@@ -139,7 +142,7 @@ class SourceToLandingOperator(BaseOperator):
                     "--jdbc_password",
                     jdbc_info["jdbc_password"],
                     "--jdbc_schema",
-                    self.jdbc_schema,
+                    self.jdbc_schema_or_database,
                     "--table_name",
                     self.table_name,
                     "--query",
@@ -154,17 +157,12 @@ class SourceToLandingOperator(BaseOperator):
 
     def execute(self, context):
         self.log.info(
-            f"Starting {self.source_type} extract for table {self.jdbc_schema}.{self.table_name}"
+            f"Starting {self.source_type} extract for table {self.jdbc_schema_or_database}.{self.table_name}"
         )
         self.log.info(f"Cluster name: {self.cluster_name}")
         self.log.info(f"Rendered output path: {self.gcs_output_path}")
 
-        jar_file_uris = self._build_jar_file_uris()
-        python_file_uris = self._build_python_file_uris()
         query = self._build_extract_query()
-
-        self.log.info(f"JAR file URIs: {jar_file_uris}")
-        self.log.info(f"Python file URIs: {python_file_uris}")
         self.log.info(f"Built query: {query}")
 
         jdbc_info = self._get_jdbc_connection_info()
