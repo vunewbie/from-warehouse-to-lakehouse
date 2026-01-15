@@ -1,10 +1,12 @@
 # vunewbie-data-engineering/plugins/operators/landing_to_bronze.py
 
 import json
-from typing import Sequence
+from typing import Sequence, Optional, List, Dict
 
 from airflow.models.baseoperator import BaseOperator
+from airflow.models import Variable
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+from airflow.utils.email import send_email
 
 
 class LandingToBronzeOperator(BaseOperator):
@@ -54,11 +56,204 @@ class LandingToBronzeOperator(BaseOperator):
         """
         return ddl.strip()
 
+    def _parse_table_id(self):
+        parts = self.bronze_table_id.split(".")
+        if len(parts) >= 2:
+            dataset_id = parts[-2]
+            table_name = parts[-1]
+            return dataset_id, table_name
+        raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
+
+    def _get_schema_from_information_schema(self, hook) -> Optional[List[Dict]]:
+        dataset_id, table_name = self._parse_table_id()
+        query = f"""
+        SELECT
+          table_catalog,
+          table_schema,
+          table_name,
+          column_name,
+          data_type,
+          is_nullable
+        FROM
+          `{self.project_id}.{dataset_id}.INFORMATION_SCHEMA.COLUMNS`
+        WHERE
+          table_name = '{table_name}'
+        ORDER BY ordinal_position
+        """
+        self.log.info(
+            f"Querying INFORMATION_SCHEMA for table {self.bronze_table_id}..."
+        )
+        try:
+            job = hook.insert_job(
+                configuration={
+                    "query": {
+                        "query": query,
+                        "useLegacySql": False,
+                    }
+                },
+                project_id=self.project_id,
+            )
+            job.result()  # Wait for job to complete
+
+            schema = []
+            try:
+                # Try pandas DataFrame approach
+                import pandas as pd
+
+                df = job.to_dataframe()
+                if df.empty:
+                    self.log.info(
+                        f"Table {self.bronze_table_id} does not exist in INFORMATION_SCHEMA."
+                    )
+                    return None
+                schema = df.to_dict("records")
+            except (AttributeError, ImportError):
+                # Fallback: iterate through rows
+                for row in job:
+                    schema.append(
+                        {
+                            "table_catalog": row.get("table_catalog"),
+                            "table_schema": row.get("table_schema"),
+                            "table_name": row.get("table_name"),
+                            "column_name": row.get("column_name"),
+                            "data_type": row.get("data_type"),
+                            "is_nullable": row.get("is_nullable"),
+                        }
+                    )
+
+            if not schema:
+                self.log.info(
+                    f"Table {self.bronze_table_id} does not exist in INFORMATION_SCHEMA."
+                )
+                return None
+
+            self.log.info(f"Retrieved {len(schema)} columns from INFORMATION_SCHEMA.")
+            return schema
+        except Exception as e:
+            self.log.warning(f"Error querying INFORMATION_SCHEMA: {e}")
+            return None
+
+    def _get_old_schema(self, hook) -> Optional[List[Dict]]:
+        """Get old schema before CREATE OR REPLACE."""
+        return self._get_schema_from_information_schema(hook)
+
+    def _get_new_schema(self, hook) -> List[Dict]:
+        """Get new schema after CREATE OR REPLACE."""
+        schema = self._get_schema_from_information_schema(hook)
+        if schema is None:
+            raise ValueError(
+                f"Could not retrieve schema for {self.bronze_table_id} after CREATE OR REPLACE."
+            )
+        return schema
+
+    def _compare_schemas(
+        self, old_schema: Optional[List[Dict]], new_schema: List[Dict]
+    ) -> Dict:
+        """Compare old and new schemas to detect changes."""
+        if old_schema is None:
+            return {
+                "is_new_table": True,
+                "has_changes": True,
+                "added_columns": [col["column_name"] for col in new_schema],
+                "removed_columns": [],
+                "modified_columns": [],
+            }
+
+        old_cols = {col["column_name"]: col for col in old_schema}
+        new_cols = {col["column_name"]: col for col in new_schema}
+
+        added_columns = [name for name in new_cols if name not in old_cols]
+        removed_columns = [name for name in old_cols if name not in new_cols]
+        modified_columns = []
+
+        for col_name in old_cols.keys() & new_cols.keys():
+            old_col = old_cols[col_name]
+            new_col = new_cols[col_name]
+            if (
+                old_col["data_type"] != new_col["data_type"]
+                or old_col["is_nullable"] != new_col["is_nullable"]
+            ):
+                modified_columns.append(col_name)
+
+        has_changes = bool(added_columns or removed_columns or modified_columns)
+
+        return {
+            "is_new_table": False,
+            "has_changes": has_changes,
+            "added_columns": added_columns,
+            "removed_columns": removed_columns,
+            "modified_columns": modified_columns,
+        }
+
+    def _send_schema_notification(self, comparison_result: Dict, context):
+        """Send email notification if schema has changed."""
+        notification_email = Variable.get("de_notification_email", default_var=None)
+        if not notification_email:
+            self.log.info(
+                "No notification email configured. Skipping schema notification."
+            )
+            return
+
+        if not comparison_result["has_changes"]:
+            self.log.info("No schema changes detected. Skipping notification.")
+            return
+
+        dag_id = context.get("dag").dag_id
+        task_id = self.task_id
+        execution_date = context.get("execution_date")
+
+        if comparison_result["is_new_table"]:
+            subject = f"🆕 [Airflow] New Bronze Table Created: {self.bronze_table_id}"
+            body = (
+                f"<h3>New Bronze External Table Created</h3>"
+                f"<p><b>Table:</b> {self.bronze_table_id}</p>"
+                f"<p><b>DAG:</b> {dag_id}</p>"
+                f"<p><b>Task:</b> {task_id}</p>"
+                f"<p><b>Execution Date:</b> {execution_date}</p>"
+                f"<h4>Schema:</h4>"
+                f"<pre>{json.dumps(comparison_result['added_columns'], indent=2)}</pre>"
+            )
+        else:
+            subject = f"⚠️ [Airflow] Schema Changed: {self.bronze_table_id}"
+            changes = []
+            if comparison_result["added_columns"]:
+                changes.append(
+                    f"<li><b>Added:</b> {', '.join(comparison_result['added_columns'])}</li>"
+                )
+            if comparison_result["removed_columns"]:
+                changes.append(
+                    f"<li><b>Removed:</b> {', '.join(comparison_result['removed_columns'])}</li>"
+                )
+            if comparison_result["modified_columns"]:
+                changes.append(
+                    f"<li><b>Modified:</b> {', '.join(comparison_result['modified_columns'])}</li>"
+                )
+            body = (
+                f"<h3>Bronze Table Schema Changed</h3>"
+                f"<p><b>Table:</b> {self.bronze_table_id}</p>"
+                f"<p><b>DAG:</b> {dag_id}</p>"
+                f"<p><b>Task:</b> {task_id}</p>"
+                f"<p><b>Execution Date:</b> {execution_date}</p>"
+                f"<h4>Changes:</h4>"
+                f"<ul>{''.join(changes)}</ul>"
+            )
+
+        try:
+            send_email(to=[notification_email], subject=subject, html_content=body)
+            self.log.info(f"Schema notification email sent to {notification_email}.")
+        except Exception as e:
+            self.log.error(f"Failed to send schema notification email: {e}")
+
     def execute(self, context):
         hook = BigQueryHook(gcp_conn_id=self.gcp_conn_id, location=self.location)
 
+        # Step 1: Get old schema
+        self.log.info("Step 1: Retrieving old schema from INFORMATION_SCHEMA...")
+        old_schema = self._get_old_schema(hook)
+
+        # Step 2: Execute CREATE OR REPLACE EXTERNAL TABLE
         ddl = self._build_create_external_table_ddl()
-        self.log.info("Executing DDL to create/replace external table...")
+        self.log.info("Step 2: Executing DDL to create/replace external table...")
         hook.insert_job(
             configuration={
                 "query": {
@@ -72,11 +267,21 @@ class LandingToBronzeOperator(BaseOperator):
             f"External table {self.bronze_table_id} created/replaced successfully."
         )
 
-        dataset_id, table_name = self.bronze_table_id.split(".")[-2:]
-        schema_from_bq = hook.get_schema(
-            dataset_id=dataset_id, table_id=table_name, project_id=self.project_id
-        )
-        current_schema = schema_from_bq.get("fields")
+        # Step 3: Get new schema
+        self.log.info("Step 3: Retrieving new schema from INFORMATION_SCHEMA...")
+        new_schema = self._get_new_schema(hook)
+
+        # Step 4: Compare schemas and send notification if changed
+        self.log.info("Step 4: Comparing schemas...")
+        comparison_result = self._compare_schemas(old_schema, new_schema)
         self.log.info(
-            f"Current schema for {self.bronze_table_id}:\n{json.dumps(current_schema, indent=2)}"
+            f"Schema comparison result:\n{json.dumps(comparison_result, indent=2)}"
         )
+
+        # Log current schema
+        self.log.info(
+            f"Current schema for {self.bronze_table_id}:\n{json.dumps(new_schema, indent=2)}"
+        )
+
+        # Send notification if schema changed
+        self._send_schema_notification(comparison_result, context)
