@@ -73,13 +73,13 @@ class ELTBuilder(BaseBuilder):
     def gcs_landing_file_name(self):
         if self.model.source_type == "mysql":
             base_path = f"data/{self.model.dag_type}/{self.model.source_database}/{self.model.table_name}"
-        
+
         elif self.model.source_type == "postgres":
             base_path = f"data/{self.model.dag_type}/{self.model.source_schema}/{self.model.table_name}"
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
-        
+
         return base_path + "/date={{ data_interval_start.format('YYYY-MM-DD') }}"
 
     @property
@@ -117,10 +117,10 @@ class ELTBuilder(BaseBuilder):
     def bronze_table_id(self):
         if self.model.source_type == "mysql":
             return f"{self.gcp_project_id}.bronze.{self.model.source_database}__{self.model.table_name}"
-        
+
         elif self.model.source_type == "postgres":
             return f"{self.gcp_project_id}.bronze.{self.model.source_schema}__{self.model.table_name}"
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -131,13 +131,13 @@ class ELTBuilder(BaseBuilder):
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_database}/{self.model.table_name}/*.parquet"
             ]
-        
+
         elif self.model.source_type == "postgres":
             return [
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_schema}/{self.model.table_name}/*.parquet"
             ]
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -148,13 +148,13 @@ class ELTBuilder(BaseBuilder):
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_database}/{self.model.table_name}/"
             )
-        
+
         elif self.model.source_type == "postgres":
             return (
                 f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
                 f"{self.model.source_schema}/{self.model.table_name}/"
             )
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -174,10 +174,10 @@ class ELTBuilder(BaseBuilder):
     def silver_staging_table_id(self):
         if self.model.source_type == "mysql":
             return f"{self.gcp_project_id}.silver_staging.{self.model.source_database}__{self.model.table_name}"
-        
+
         elif self.model.source_type == "postgres":
             return f"{self.gcp_project_id}.silver_staging.{self.model.source_schema}__{self.model.table_name}"
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
@@ -185,10 +185,10 @@ class ELTBuilder(BaseBuilder):
     def silver_staging_gcs_uri(self):
         if self.model.source_type == "mysql":
             return f"gs://{self.gcs_bucket_name}/silver_staging/{self.model.source_database}/{self.model.table_name}"
-        
+
         elif self.model.source_type == "postgres":
             return f"gs://{self.gcs_bucket_name}/silver_staging/{self.model.source_schema}/{self.model.table_name}"
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
