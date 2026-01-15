@@ -27,7 +27,7 @@ general:
     clustered_by: [modified_date]
     extract_conditions: 
       - [modified_date, ">=", last_extracted_variable_key]
-    start_date: "20260113"
+    start_date: "20260115"
 
 entities:
   - table_name: product_vendor

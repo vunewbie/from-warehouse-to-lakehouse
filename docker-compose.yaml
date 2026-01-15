@@ -23,14 +23,11 @@ x-airflow-common:
     AIRFLOW__SMTP__SMTP_PASSWORD: ${AIRFLOW__SMTP__SMTP_PASSWORD}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    DBT_PROFILES_DIR: /opt/airflow/dbt/profiles
   env_file:
     - .env
   volumes:
     - ./dags:/opt/airflow/dags
     - ./plugins:/opt/airflow/plugins
-    - ./dbt:/opt/airflow/dbt
-    - ./gcp-sa.json:/opt/airflow/keys/gcp-sa.json:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
