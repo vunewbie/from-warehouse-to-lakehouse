@@ -1,8 +1,3 @@
-"""
-PySpark schema utilities for ELT pipeline.
-"""
-
-import re
 from pyspark.sql.types import (
     IntegerType,
     LongType,
@@ -18,83 +13,113 @@ from pyspark.sql.types import (
     BinaryType,
     StructType,
     StructField,
+    NullType,
 )
-from pyspark.sql import SparkSession
 
-# Type mapping dictionaries
+# https://apache.github.io/spark/sql-data-sources-jdbc.html
 MYSQL_TO_SPARK_DATA_TYPE = {
-    "tinyint": "IntegerType",
-    "smallint": "IntegerType",
-    "mediumint": "IntegerType",
-    "int": "IntegerType",
-    "integer": "IntegerType",
-    "bigint": "LongType",
-    "float": "DoubleType",
-    "double": "DoubleType",
-    "decimal": "DecimalType",
-    "numeric": "DecimalType",
-    "char": "StringType",
-    "varchar": "StringType",
-    "text": "StringType",
-    "longtext": "StringType",
-    "mediumtext": "StringType",
-    "tinytext": "StringType",
-    "date": "DateType",
-    "datetime": "TimestampType",
-    "timestamp": "TimestampType",
-    "time": "StringType",  # Already CAST to CHAR in VIEW
-    "blob": "BinaryType",
-    "binary": "BinaryType",
-    "varbinary": "BinaryType",
-    "longblob": "BinaryType",
-    "mediumblob": "BinaryType",
-    "tinyblob": "BinaryType",
-    "bit": "BooleanType",
+    # --- Numeric Types ---
+    "bit": "BooleanType",         
+    "tinyint": "ByteType",        
+    "smallint": "ShortType",      
+    "mediumint": "IntegerType",   
+    "int": "IntegerType",         
+    "integer": "IntegerType",     
+    "bigint": "LongType",         
+    "float": "FloatType",         
+    "double": "DoubleType",       
+    "decimal": "DecimalType",     
+    "numeric": "DecimalType",     
+
+    # --- Date/Time Types ---
+    "date": "DateType",           
+    "datetime": "TimestampType",  
+    "timestamp": "TimestampType", 
+    "time": "TimestampType",      
+    "year": "DateType",           
+
+    # --- String/Text Types ---
+    "char": "StringType",         
+    "varchar": "StringType",      
+    "text": "StringType",         
+    "tinytext": "StringType",     
+    "mediumtext": "StringType",   
+    "longtext": "StringType",     
+    "json": "StringType",         
+    "enum": "StringType",         
+    "set": "StringType",          
+
+    # --- Binary Types ---
+    "binary": "BinaryType",       
+    "varbinary": "BinaryType",    
+    "blob": "BinaryType",         
+    "tinyblob": "BinaryType",     
+    "mediumblob": "BinaryType",   
+    "longblob": "BinaryType",     
+    "geometry": "BinaryType",     
 }
 
 POSTGRES_TO_SPARK_DATA_TYPE = {
-    "smallint": "IntegerType",
-    "integer": "IntegerType",
-    "int": "IntegerType",
-    "bigint": "LongType",
-    "serial": "IntegerType",
-    "bigserial": "LongType",
-    "real": "DoubleType",
-    "double precision": "DoubleType",
-    "numeric": "DecimalType",
-    "decimal": "DecimalType",
-    "money": "DecimalType",
-    "boolean": "BooleanType",
-    "bool": "BooleanType",
-    "char": "StringType",
-    "character": "StringType",
-    "varchar": "StringType",
-    "character varying": "StringType",
-    "text": "StringType",
-    "date": "DateType",
-    "timestamp": "TimestampType",
+    # --- Numeric Types ---
+    "smallint": "ShortType",      
+    "smallserial": "ShortType",   
+    "integer": "IntegerType",     
+    "serial": "IntegerType",      
+    "bigint": "LongType",         
+    "bigserial": "LongType",      
+    "real": "FloatType",          
+    "float": "FloatType",         
+    "double precision": "DoubleType", 
+    "numeric": "DecimalType",     
+    "decimal": "DecimalType",     
+    "money": "StringType",        
+    "oid": "DecimalType",         
+
+    # --- Boolean ---
+    "boolean": "BooleanType",     
+    "bool": "BooleanType",        
+    "bit": "BooleanType",         
+
+    # --- String/Text Types ---
+    "character varying": "StringType", 
+    "varchar": "StringType",          
+    "character": "StringType",        
+    "char": "StringType",             
+    "bpchar": "StringType",           
+    "text": "StringType",             
+    "uuid": "StringType",             
+    "xml": "StringType",              
+    "json": "StringType",             
+    "jsonb": "StringType",            
+    
+    # --- Network/Geo/Other Strings ---
+    "inet": "StringType",         
+    "cidr": "StringType",         
+    "macaddr": "StringType",      
+    "point": "StringType",        
+    "interval": "StringType",     
+    "tsvector": "StringType",     
+
+    # --- Date/Time Types ---
+    "date": "DateType",           
+    "timestamp": "TimestampType", 
     "timestamp without time zone": "TimestampType",
     "timestamp with time zone": "TimestampType",
-    "timestamptz": "TimestampType",
-    "time": "StringType",  # Already CAST to VARCHAR in VIEW
-    "time without time zone": "StringType",
-    "time with time zone": "StringType",
-    "bytea": "BinaryType",
-    "json": "StringType",
-    "jsonb": "StringType",
-    "uuid": "StringType",
-    "xml": "StringType",
-    "name": "StringType",
-    "bit": "BooleanType",
-    "bit varying": "BooleanType",
+    "timestamptz": "TimestampType", 
+    "time": "TimestampType",      
+    "time without time zone": "TimestampType",
+    "time with time zone": "TimestampType",
+
+    # --- Binary Types ---
+    "bytea": "BinaryType",        
 }
 
 BASE_SPARK_TYPES = {
     "IntegerType": IntegerType,
     "LongType": LongType,
-    "ShortType": ShortType,
-    "ByteType": ByteType,
-    "FloatType": FloatType,
+    "ShortType": ShortType,       
+    "ByteType": ByteType,         
+    "FloatType": FloatType,       
     "DoubleType": DoubleType,
     "DecimalType": DecimalType,
     "StringType": StringType,
@@ -102,6 +127,7 @@ BASE_SPARK_TYPES = {
     "DateType": DateType,
     "TimestampType": TimestampType,
     "BinaryType": BinaryType,
+    "NullType": NullType,
 }
 
 
