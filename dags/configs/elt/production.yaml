@@ -11,6 +11,7 @@ general:
   source_configs:
     source_type: postgres
     source_conn_id: adventureworks_production
+    source_database: defaultdb
     source_schema: production
 
   gcp_configs:
