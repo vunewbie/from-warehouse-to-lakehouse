@@ -142,7 +142,9 @@ class ELTBuilder(BaseBuilder):
         watermark_column = max(self.model.clustered_by)
 
         def _set_var(**context):
-            hook = BigQueryHook(gcp_conn_id=self.gcp_conn_id, location=self.gcp_location)
+            hook = BigQueryHook(
+                gcp_conn_id=self.gcp_conn_id, location=self.gcp_location
+            )
 
             query = f"""
             SELECT

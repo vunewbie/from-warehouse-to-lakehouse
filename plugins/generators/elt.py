@@ -103,8 +103,17 @@ class ELTGenerator(BaseGenerator):
 
             # Define the task dependency chain
             if set_last_extracted_variable_task is not None:
-                source_to_landing_task >> landing_to_bronze_task >> bronze_to_silver_staging_task >> set_last_extracted_variable_task
+                (
+                    source_to_landing_task
+                    >> landing_to_bronze_task
+                    >> bronze_to_silver_staging_task
+                    >> set_last_extracted_variable_task
+                )
             else:
-                source_to_landing_task >> landing_to_bronze_task >> bronze_to_silver_staging_task
+                (
+                    source_to_landing_task
+                    >> landing_to_bronze_task
+                    >> bronze_to_silver_staging_task
+                )
 
         return (dag_id, dag)
