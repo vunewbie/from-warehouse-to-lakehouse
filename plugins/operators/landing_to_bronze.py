@@ -101,9 +101,7 @@ class LandingToBronzeOperator(BaseOperator):
             )
         return schema
 
-    def _compare_schemas(
-        self, old_schema, new_schema
-    ):
+    def _compare_schemas(self, old_schema, new_schema):
         """Compare old and new schemas to detect changes."""
         if old_schema is None:
             return {

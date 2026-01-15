@@ -92,7 +92,7 @@ class ELTBuilder(BaseBuilder):
 
         elif self.model.source_type == "postgres":
             jdbc_schema_or_database = self.model.source_schema
-        
+
         else:
             raise ValueError(f"Unsupported source_type: {self.model.source_type}")
 
