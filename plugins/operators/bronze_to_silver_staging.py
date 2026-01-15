@@ -4,6 +4,8 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from google.cloud.exceptions import NotFound
 
+from helpers.utils import fetch_information_schema_columns
+
 
 class BronzeToSilverStagingOperator(BaseOperator):
     """Upsert data from a Bronze external table to a Silver Staging partitioned table.
@@ -36,14 +38,39 @@ class BronzeToSilverStagingOperator(BaseOperator):
         self.cluster_keys = cluster_keys or primary_keys
 
     def _get_bronze_schema(self, hook):
-        """Retrieves schema from the Bronze table."""
-        bronze_dataset_id, bronze_table_name = self.bronze_table_id.split(".")[-2:]
-        bronze_schema = hook.get_schema(
-            dataset_id=bronze_dataset_id,
-            table_id=bronze_table_name,
-            project_id=self.project_id,
+        """Retrieves schema from the Bronze table using INFORMATION_SCHEMA for DDL-compatible types."""
+        self.log.info(
+            f"Retrieving schema for {self.bronze_table_id} from INFORMATION_SCHEMA..."
         )
-        return bronze_schema
+
+        try:
+            bronze_dataset_id, bronze_table_name = self.bronze_table_id.split(".")[-2:]
+        except ValueError:
+            raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
+
+        try:
+            rows = fetch_information_schema_columns(
+                hook=hook,
+                project_id=self.project_id,
+                dataset_id=bronze_dataset_id,
+                table_name=bronze_table_name,
+                select_mode="ddl",
+            )
+            if not rows:
+                raise ValueError(
+                    f"Could not retrieve schema for table {self.bronze_table_id}. Is the table empty or does not exist?"
+                )
+
+            schema_fields = [
+                {"name": r["column_name"], "type": r["data_type"]} for r in rows
+            ]
+            self.log.info(f"Successfully retrieved {len(schema_fields)} columns.")
+            return {"fields": schema_fields}
+        except Exception as e:
+            self.log.error(
+                f"Error querying INFORMATION_SCHEMA for {self.bronze_table_id}: {e}"
+            )
+            raise
 
     def _build_create_partitioned_table_ddl(self, bronze_schema):
         """Builds the CREATE TABLE DDL statement for partitioned table."""

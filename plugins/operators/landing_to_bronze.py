@@ -6,6 +6,8 @@ from airflow.models import Variable
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.utils.email import send_email
 
+from helpers.utils import fetch_information_schema_columns
+
 
 class LandingToBronzeOperator(BaseOperator):
     """Create or replace Bronze external table in BigQuery from Parquet files on GCS."""
@@ -64,63 +66,22 @@ class LandingToBronzeOperator(BaseOperator):
 
     def _get_schema_from_information_schema(self, hook) -> Optional[List[Dict]]:
         dataset_id, table_name = self._parse_table_id()
-        query = f"""
-        SELECT
-          table_catalog,
-          table_schema,
-          table_name,
-          column_name,
-          data_type,
-          is_nullable
-        FROM
-          `{self.project_id}.{dataset_id}.INFORMATION_SCHEMA.COLUMNS`
-        WHERE
-          table_name = '{table_name}'
-        ORDER BY ordinal_position
-        """
         self.log.info(
             f"Querying INFORMATION_SCHEMA for table {self.bronze_table_id}..."
         )
         try:
-            job = hook.insert_job(
-                configuration={
-                    "query": {
-                        "query": query,
-                        "useLegacySql": False,
-                    }
-                },
+            schema = fetch_information_schema_columns(
+                hook=hook,
                 project_id=self.project_id,
+                dataset_id=dataset_id,
+                table_name=table_name,
+                select_mode="full",
             )
-            job.result()  # Wait for job to complete
-            schema = []
-
-            try:
-                df = job.to_dataframe()
-                if df.empty:
-                    self.log.info(
-                        f"Table {self.bronze_table_id} does not exist in INFORMATION_SCHEMA."
-                    )
-                    return None
-                schema = df.to_dict("records")
-            except (AttributeError, ImportError):
-                for row in job:
-                    schema.append(
-                        {
-                            "table_catalog": row.get("table_catalog"),
-                            "table_schema": row.get("table_schema"),
-                            "table_name": row.get("table_name"),
-                            "column_name": row.get("column_name"),
-                            "data_type": row.get("data_type"),
-                            "is_nullable": row.get("is_nullable"),
-                        }
-                    )
-
             if not schema:
                 self.log.info(
                     f"Table {self.bronze_table_id} does not exist in INFORMATION_SCHEMA."
                 )
                 return None
-
             self.log.info(f"Retrieved {len(schema)} columns from INFORMATION_SCHEMA.")
             return schema
         except Exception as e:
