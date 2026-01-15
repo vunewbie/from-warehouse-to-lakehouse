@@ -245,7 +245,7 @@ class LandingToBronzeOperator(BaseOperator):
         old_schema = self._get_old_schema(hook)
 
         ddl = self._build_create_external_table_ddl()
-        self.log.info("Executing DDL to create/replace external table...")
+        self.log.info("Step 2: Executing DDL to create/replace external table...")
         hook.insert_job(
             configuration={
                 "query": {
