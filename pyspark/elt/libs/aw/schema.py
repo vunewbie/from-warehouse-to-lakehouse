@@ -28,7 +28,7 @@ MYSQL_TO_SPARK_DATA_TYPE = {
     "int": "IntegerType",         
     "integer": "IntegerType",     
     "bigint": "LongType",         
-    "float": "FloatType",         
+    "float": "DoubleType",         
     "double": "DoubleType",       
     "decimal": "DecimalType",     
     "numeric": "DecimalType",     
