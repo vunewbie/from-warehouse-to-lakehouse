@@ -4,6 +4,8 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from google.cloud.exceptions import NotFound
 
+from helpers.utils import fetch_information_schema_columns
+
 
 class BronzeToSilverStagingOperator(BaseOperator):
     """Upsert data from a Bronze external table to a Silver Staging partitioned table.
@@ -46,38 +48,22 @@ class BronzeToSilverStagingOperator(BaseOperator):
         except ValueError:
             raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
 
-        query = f"""
-        SELECT
-            column_name,
-            data_type
-        FROM `{self.project_id}.{bronze_dataset_id}.INFORMATION_SCHEMA.COLUMNS`
-        WHERE table_name = '{bronze_table_name}'
-        ORDER BY ordinal_position
-        """
-
         try:
-            job = hook.insert_job(
-                configuration={
-                    "query": {
-                        "query": query,
-                        "useLegacySql": False,
-                    }
-                },
+            rows = fetch_information_schema_columns(
+                hook=hook,
                 project_id=self.project_id,
+                dataset_id=bronze_dataset_id,
+                table_name=bronze_table_name,
+                select_mode="ddl",
             )
-            job.result()  # Wait for job to complete
-
-            schema_fields = []
-            for row in job:
-                schema_fields.append(
-                    {"name": row.get("column_name"), "type": row.get("data_type")}
-                )
-
-            if not schema_fields:
+            if not rows:
                 raise ValueError(
                     f"Could not retrieve schema for table {self.bronze_table_id}. Is the table empty or does not exist?"
                 )
 
+            schema_fields = [
+                {"name": r["column_name"], "type": r["data_type"]} for r in rows
+            ]
             self.log.info(f"Successfully retrieved {len(schema_fields)} columns.")
             return {"fields": schema_fields}
         except Exception as e:
