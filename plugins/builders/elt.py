@@ -118,38 +118,24 @@ class ELTBuilder(BaseBuilder):
     @property
     def bronze_table_id(self):
         namespace = self.model.source_schema or self.model.source_database
-        dataset = f"bronze__{self.model.source_database}"
-        return f"{self.gcp_project_id}.{dataset}.{namespace}__{self.model.table_name}"
+        dataset = f"bronze__{namespace}"
+        return f"{self.gcp_project_id}.{dataset}.{self.model.table_name}"
 
     @property
     def bronze_external_uris(self):
-        if self.model.source_type == "mysql":
-            return [
-                f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-                f"{self.model.source_database}/{self.model.table_name}/*.parquet"
-            ]
-        elif self.model.source_type == "postgres":
-            return [
-                f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-                f"{self.model.source_schema}/{self.model.table_name}/*.parquet"
-            ]
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
+        namespace = self.model.source_schema or self.model.source_database
+        return [
+            f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
+            f"{namespace}/{self.model.table_name}/*.parquet"
+        ]
 
     @property
     def hive_partition_uri_prefix(self):
-        if self.model.source_type == "mysql":
-            return (
-                f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-                f"{self.model.source_database}/{self.model.table_name}/"
-            )
-        elif self.model.source_type == "postgres":
-            return (
-                f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-                f"{self.model.source_schema}/{self.model.table_name}/"
-            )
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
+        namespace = self.model.source_schema or self.model.source_database
+        return (
+            f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
+            f"{namespace}/{self.model.table_name}/"
+        )
 
     def _get_landing_to_bronze_task(self):
         return LandingToBronzeOperator(
@@ -166,19 +152,13 @@ class ELTBuilder(BaseBuilder):
     @property
     def silver_staging_table_id(self):
         namespace = self.model.source_schema or self.model.source_database
-        dataset = f"silver_staging__{self.model.source_database}"
-        return f"{self.gcp_project_id}.{dataset}.{namespace}__{self.model.table_name}"
+        dataset = f"silver_staging__{namespace}"
+        return f"{self.gcp_project_id}.{dataset}.{self.model.table_name}"
 
     @property
     def silver_staging_gcs_uri(self):
-        if self.model.source_type == "mysql":
-            return f"gs://{self.gcs_bucket_name}/silver_staging/{self.model.source_database}/{self.model.table_name}"
-
-        elif self.model.source_type == "postgres":
-            return f"gs://{self.gcs_bucket_name}/silver_staging/{self.model.source_schema}/{self.model.table_name}"
-
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
+        namespace = self.model.source_schema or self.model.source_database
+        return f"gs://{self.gcs_bucket_name}/silver_staging/{namespace}/{self.model.table_name}"
 
     def _get_bronze_to_silver_staging_task(self):
         return BronzeToSilverStagingOperator(

@@ -52,7 +52,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
             rows = fetch_information_schema_columns(
                 hook=hook,
                 project_id=self.project_id,
-            dataset_id=bronze_dataset_id,
+                dataset_id=bronze_dataset_id,
                 table_name=bronze_table_name,
                 select_mode="ddl",
             )
