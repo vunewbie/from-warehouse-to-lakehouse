@@ -76,11 +76,13 @@ This project aims to demonstrate my ability to apply these architectural concept
     *   **DAG Syntax Validation**: Ensures that all Airflow DAGs are syntactically correct.
     *   **Test Image Build**: Builds a Docker image to verify that it can be created successfully.
     *   **YAML Syntax Validation**: Checks the syntax of all `.yaml` configuration files.
+    ![Continuouse Integration](images/ci.png)
 
 *   **Continuous Deployment (CD)**: Whenever a pull request is merged into the `main` branch, GitHub Actions automates the deployment process:
     *   **Build and Push Image**: Builds the Docker image using the `Dockerfile` and pushes it to Docker Hub.
     *   **Upload PySpark Code**: Uploads the `pyspark/` folder, which contains PySpark code and custom-built libraries, to GCS Buckets.
     *   **Deploy to VM**: SSHes into the Compute Engine VM running the Airflow server, pulls the latest code and Docker image, and restarts the services using `docker compose up`.
+    ![Continuouse Deployment](images/cd.png)
 
 ### Orchestration
 
