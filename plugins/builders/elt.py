@@ -117,14 +117,9 @@ class ELTBuilder(BaseBuilder):
     # Landing to Bronze
     @property
     def bronze_table_id(self):
-        if self.model.source_type == "mysql":
-            return f"{self.gcp_project_id}.bronze.{self.model.source_database}__{self.model.table_name}"
-
-        elif self.model.source_type == "postgres":
-            return f"{self.gcp_project_id}.bronze.{self.model.source_schema}__{self.model.table_name}"
-
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
+        namespace = self.model.source_schema or self.model.source_database
+        dataset = f"bronze__{self.model.source_database}"
+        return f"{self.gcp_project_id}.{dataset}.{namespace}__{self.model.table_name}"
 
     @property
     def bronze_external_uris(self):
@@ -170,14 +165,9 @@ class ELTBuilder(BaseBuilder):
     # Bronze to Silver staging
     @property
     def silver_staging_table_id(self):
-        if self.model.source_type == "mysql":
-            return f"{self.gcp_project_id}.silver_staging.{self.model.source_database}__{self.model.table_name}"
-
-        elif self.model.source_type == "postgres":
-            return f"{self.gcp_project_id}.silver_staging.{self.model.source_schema}__{self.model.table_name}"
-
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
+        namespace = self.model.source_schema or self.model.source_database
+        dataset = f"silver_staging__{self.model.source_database}"
+        return f"{self.gcp_project_id}.{dataset}.{namespace}__{self.model.table_name}"
 
     @property
     def silver_staging_gcs_uri(self):
