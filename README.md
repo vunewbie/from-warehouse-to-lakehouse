@@ -4,40 +4,43 @@
 
 ## Overview
 
-> This is a data engineering project built by me—a **data engineering intern at Pizza 4P's**. The project showcases my self-driven learning journey and unforgettable experiences at Pizza 4P's. To make this project more engaging, I'll tell you the story of **vunewbie**, a business founded by Nguyen Hoang Vu, a young entrepreneur with big dreams.
+This data engineering project was built to demonstrate the skills and knowledge I acquired from my mentor, combined with my own self-study and exploration during my internship at Pizza 4P's.
 
-### The Startup Phase
+The project follows the journey of a fictional startup, **vunewbie**, as it evolves its data architecture from a simple system designed for a small business into a modern, scalable platform fit for a medium-sized enterprise.
 
-In the early days of starting his small company, Vu chose **MongoDB** for his NoSQL database to "cram" everything into documents, prioritizing speed and simplicity. He also built a traditional ETL pipeline following a Data Warehouse architecture to serve basic reporting needs.
+### Phase 1: The Startup Era - A Simple ETL Pipeline
 
-To minimize costs, Vu decided on:
+In its early days, vunewbie prioritized rapid development and simplicity. They chose **MongoDB** as their OLTP database and designed a straightforward ETL pipeline to handle daily reporting and dashboarding needs. 
 
-- **MongoDB** for the OLTP database
-- **PySpark** for ingestion and transformation across the entire pipeline
-- A single **PostgreSQL** database instance with two schemas for NDS and DDS
-- **Superset** for simple dashboards and reports
+The process was as follows:
+*   **Staging**: Raw data was extracted into a staging area as `.json` files.
+*   **NDS (Normalized Data Store)**: Data was then loaded into a PostgreSQL schema, where it was deduplicated, cleaned, and normalized to 3NF.
+*   **DDS (Dimensional Data Store)**: Finally, the cleaned data was loaded into dimension and fact tables in a separate schema within the same PostgreSQL instance. This layer served as the data warehouse for creating simple dashboards in **Superset**. The entire pipeline was automated using **Airflow**.
 
-### Growing Pains
+### The Breaking Point: Challenges of Scale
 
-Years later, vunewbie flourished and became one of the largest companies in the country. However, this growth came with challenges:
+This initial architecture was effective for its time, offering a fast, cost-efficient solution built on open-source tools. However, as vunewbie grew, the design began to show its limitations:
 
-- MongoDB couldn't meet ACID requirements
-- Having only three layers (Staging, NDS, DDS) made data reprocessing extremely difficult, especially with schema evolution issues
-- The AI/ML team needed deduplicated raw data for model training but neither NDS nor DDS could provide it
-- Superset couldn't meet the increasingly high demands of the DA/BI team
-- A single MongoDB instance was overloaded
+*   **ACID Compliance**: MongoDB could not provide the same ACID guarantees for transactions as a relational database.
+*   **Debugging and Data Science Needs**: The lack of a structured, raw data layer made debugging pipeline failures incredibly difficult. It also meant the AI/DS team had no access to deduplicated raw data for model training.
+*   **Historical Data**: The NDS implemented SCD Type 1, overwriting records and erasing historical context. To analyze past data, a new, costly pipeline had to be built to reprocess data from the original `.json` files.
+*   **Data Governance**: The DDS was a monolithic structure, with shared tables not organized into specific data marts for each department.
+*   **BI Tooling**: While free, **Superset** lacked the advanced features required by the BI/DA teams as their analytical needs grew more complex.
 
-### The Transformation
+### Phase 2: The Scale-Up - A Modern Lakehouse Architecture
 
-Facing these challenges, the Founder and Data Manager decided to design a completely new architecture:
+To address these critical challenges, vunewbie adopted a new ELT pipeline based on a modern lakehouse paradigm. This new architecture, inspired by the medallion model, introduced a multi-layered approach:
 
-- **MongoDB** was replaced by two relational databases—**MySQL** and **PostgreSQL**
-- The architecture shifted from a traditional Data Warehouse to a modern **Lakehouse** architecture that balances both cost and performance
-- The data team chose **PySpark** to ingest data from databases into `.parquet` files instead of `.json`
-- Data is stored in **Google Cloud Storage**
-- **Bronze layer**: raw external tables
-- **Silver layer**: Iceberg managed tables at the staging level and partitioned tables at the intermediate level
-- **Gold layer**: curated partitioned tables and cube materialized views, visualized using **Tableau**
+*   **Data Source**: The legacy MongoDB was replaced with two relational databases, **PostgreSQL** and **MySQL**, built on a newly designed schema.
+*   **Landing Layer**: Replacing the old staging area, this layer stores data as **`.parquet`** files. This format was chosen for its superior advantages over `.json`, such as cost-effective compressed storage, optimized columnar reading, and strong compatibility with Spark.
+*   **Bronze Layer**: This layer serves as a queryable archive for raw data. It consists of BigQuery **external tables** that act as a metadata layer over the `.parquet` files, allowing engineers to debug pipeline failures using standard SQL.
+*   **Silver Staging Layer**: This layer provides raw, deduplicated data, specifically designed to meet the needs of the AI/DS teams who require access to clean, unprocessed data for model training.
+*   **Silver Intermediate Layer**: The successor to the old NDS, this layer implements **SCD Type 2** to preserve a full historical record of all changes. This allows for powerful historical analysis without the need to reprocess data from the landing layer.
+*   **Gold Curated Layer**: This is the new DDS, now organized into departmental **data marts**. It upserts data from the Silver Intermediate Layer, ensuring that business users always have the latest, most accurate information.
+*   **Gold Cube Layer**: This layer contains pre-aggregated data across multiple dimensions, optimized for high-performance dashboarding and visualization.
+*   **BI Tool**: The company upgraded to **Tableau**, a powerful, industry-leading BI tool.
+
+This project aims to demonstrate my ability to apply these architectural concepts to build a system that is not only scalable and reusable but also easy to debug and maintain, covering a wide range of real-world data engineering challenges.
 
 ---
 
@@ -45,190 +48,100 @@ Facing these challenges, the Founder and Data Manager decided to design a comple
 
 ![Architecture Diagram](images/architecture.png)
 
-### Legacy Architecture: ETL Pipeline with Traditional Data Warehouse
+### ETL Pipeline with Traditional Data Warehouse
 
-#### Source
+*   **Data Source**: The original data is from the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce?select=olist_order_items_dataset.csv). The individual `.csv` files were consolidated into collections of multiple documents.
+*   **Staging**: Data is extracted 1:1 from the source as `.json` files and stored in GCS buckets.
+*   **NDS (Normalized Data Store)**: Data from staging is deduplicated, cleaned, and transformed into 3NF with SCD Type 1.
+*   **DDS (Dimensional Data Store)**: Data from the NDS is upserted into dimension and fact tables. A few cube views are also created for user consumption.
 
-Simulated from the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce/data) by consolidating raw data into documents.
+### ELT Pipeline with Modern Data Lakehouse
 
-#### Staging
-
-Data is extracted as `.json` files using **PySpark**. Jobs are executed by **Google Cloud Dataproc Serverless** to optimize costs and reduce operational complexity.
-
-#### Normalized Data Store (NDS)
-
-Data from `.json` files is normalized to **3NF**, deduplicated, and cleaned in the `nds` schema of a single PostgreSQL instance.
-
-#### Dimensional Data Store (DDS)
-
-Data is loaded into the data warehouse in a simple **star schema** format. OLAP/cube views are created for Superset to perform visualization.
-
----
-
-### Modern Architecture: ELT with Modern Lakehouse
-
-#### Source
-
-Simulated from [AdventureWorks sample databases](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms) by importing data from SQL Server into two databases:
-
-- **`adventureworks-identities`** (MySQL) with two schemas:
-  - `person`
-  - `human_resources`
-- **`adventureworks-operations`** (PostgreSQL) with three schemas:
-  - `production`
-  - `sales`
-  - `purchasing`
-
-#### Landing
-
-Data is extracted as **`.parquet`** files into **Google Cloud Storage** to optimize storage costs and read performance.
-
-#### Bronze
-
-These are **BigQuery external tables**. Data at this layer is write-append only—or more accurately, it's a metadata layer that allows querying data in `.parquet` files as if they were physical tables. This helps the DE team audit data when errors occur.
-
-#### Silver Staging
-
-These are **Iceberg managed tables**. This layer was created to separate deduplication and data transformation. Data is still stored as `.parquet` files, but Iceberg, beyond being a metadata layer, also supports many features such as:
-
-- Automatic schema evolution handling
-- Excellent support for various tools like Spark, Trino, etc.
-
-> **Note:** This is the deduplicated raw layer that AI/DS teams need.
-
-#### Silver Intermediate
-
-These are **partitioned tables**. This layer was created for the DE team to clean data in preparation for loading into dimension and fact tables in Gold.
-
-#### Gold Curated
-
-Data at this layer is organized in a **star schema** format. Each department has its own data mart for use. Additionally, there are OLAP tables that are pre-joined together to facilitate querying.
-
-#### Gold Cube
-
-Pre-aggregated data across multiple dimensions using **materialized views**, which will be visualized using **Tableau**.
+*   **Data Source**: The original data is from the [AdventureWorks sample databases](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms). The dataset, originally a `.bak` file for SQL Server, was migrated to two databases, PostgreSQL and MySQL, using DBeaver's data migration feature.
+*   **Landing**: Data is extracted daily as `.parquet` files and stored in a GCS bucket.
+*   **Bronze**: BigQuery external tables serve as a metadata layer over the `.parquet` files, allowing DEs to query them directly as if they were real tables.
+*   **Silver Staging**: Data is deduplicated but not yet cleaned, serving the needs of model building. Partitioned tables are used to optimize queries.
+*   **Silver Intermediate**: SCD Type 2 is applied to store historical data during the cleaning process. This layer also uses partitioned tables.
+*   **Gold Curated**: Partitioned dimension and fact tables are organized into multiple data marts to serve various departments.
+*   **Gold Cube**: This layer has the highest query frequency, as users tend to refresh, filter, and sort directly on the dashboard. Therefore, Materialized Views are used to leverage their ability to incrementally add new data while ensuring continuous read access for users.
 
 ---
 
-### Orchestration and CI/CD
+## Data Flow
 
-The CI/CD process is very straightforward:
+### CI/CD
 
-#### Continuous Integration
+*   **Continuous Integration (CI)**: Whenever code is pushed to any branch other than `main`, GitHub Actions automatically triggers four parallel jobs to accelerate the CI process:
+    *   **Code Style and Formatting Check**: Uses Python libraries like `black`, `flake8`, and `pylint` to enforce code quality.
+    *   **DAG Syntax Validation**: Ensures that all Airflow DAGs are syntactically correct.
+    *   **Test Image Build**: Builds a Docker image to verify that it can be created successfully.
+    *   **YAML Syntax Validation**: Checks the syntax of all `.yaml` configuration files.
 
-Whenever code is pushed to a branch, it automatically:
+*   **Continuous Deployment (CD)**: Whenever a pull request is merged into the `main` branch, GitHub Actions automates the deployment process:
+    *   **Build and Push Image**: Builds the Docker image using the `Dockerfile` and pushes it to Docker Hub.
+    *   **Upload PySpark Code**: Uploads the `pyspark/` folder, which contains PySpark code and custom-built libraries, to GCS Buckets.
+    *   **Deploy to VM**: SSHes into the Compute Engine VM running the Airflow server, pulls the latest code and Docker image, and restarts the services using `docker compose up`.
 
-- Checks code style
-- Validates DAG syntax
-- Builds images for testing
-- Verifies YAML file imports
+### Orchestration
 
-#### Continuous Deployment
+Airflow schedules the DAGs and executes jobs at the specified times.
 
-Whenever a pull request is merged into `main`:
+*   **ETL Pipeline**:
+    *   Airflow triggers a Dataproc job to execute a PySpark script, pushing data to GCS Landing buckets.
+    *   Airflow then triggers another Dataproc job to deduplicate, clean, transform the data to 3NF, and load it into the **NDS (Normalized Data Store)**.
+    *   Finally, Airflow triggers a third Dataproc job to upsert the data into the dimension and fact tables in the **DDS (Dimensional Data Store)**.
+    *   The cubes are standard views and do not require separate scheduling.
 
-1. The image is automatically built and pushed to **Docker Hub**
-2. PySpark code is uploaded to the **GCS bucket**
-3. **GitHub Actions** SSH into the VM to pull the code and image
-4. Server is restarted
+*   **ELT Pipeline**:
+    *   Airflow triggers a Dataproc job to execute a PySpark script, which pushes data to GCS Landing buckets.
+    *   Airflow then builds DDL to create or update external tables in the **Bronze** layer. It also compares the schema and sends an email notification to the DE team about new/updated schemas.
+    *   Next, Airflow builds a `MERGE` statement to deduplicate data from the Parquet files and upserts it into the **Silver Staging** layer.
+    *   Airflow's tasks for this pipeline end here.
+    *   A separate Dataform job scheduler triggers a job for BigQuery to clean and load data into the **Silver Intermediate** layer using SCD Type 2 to maintain historical data.
+    *   Dataform then triggers another job to load the latest transformed data into the **Gold Curated** layer.
+    *   The Materialized Views in the **Gold Cube** layer automatically load new data incrementally, requiring no additional scheduling.
 
 ---
 
 ## Data Source Guide
 
-### MongoDB: Brazilian E-Commerce Dataset (Olist)
+### ETL: Olist Legacy Data Source
 
-This section describes how to simulate the MongoDB data source using the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce/data). The process consolidates multiple CSV files into MongoDB document collections.
+This section provides a step-by-step guide on how to set up the Olist legacy data source for the ETL pipeline.
 
-#### Step 1: Prepare Geolocation Collection
+1.  **Download the Dataset**: Download the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce?select=olist_order_items_dataset.csv) and place the `.csv` files in the `data_source/mongo/` directory.
 
-Load the geolocation dataset and create a standalone collection. Remove duplicates based on zip code prefix, city, and state to ensure unique combinations for merging with customers and sellers.
+2.  **Run the Data Generation Script**: Open the `data_source/mongo/data_generation.ipynb` notebook and run all cells. This script will consolidate the `.csv` files into multiple collections in your MongoDB instance.
 
-#### Step 2: Create Customers Collection
+    ![Olist Legacy Data Source Guide 1](images/olist_legacy_data_source_guide_1.png)
 
-Load customer data and merge with geolocation information based on zip code prefix, city, and state. Create a nested `geolocation` field within each customer document. Use a left join to preserve all customers even if geolocation data is missing (simulating real-world data quality issues).
+3.  **Verify the Data**: Connect to your MongoDB instance and verify that the collections have been created successfully.
 
-#### Step 3: Create Sellers Collection
+    ![Olist Legacy Data Source Guide 2](images/olist_legacy_data_source_guide_2.png)
 
-Load seller data and merge with geolocation information using the same approach as customers. Create nested `geolocation` fields within seller documents.
+    ![Olist Legacy Data Source Guide 3](images/olist_legacy_data_source_guide_3.png)
 
-#### Step 4: Create Products Collection
+### ELT: AdventureWorks Data Source
 
-Load product data and merge with the product category translation file to enrich category names with English translations. Normalize category names for better matching.
+This section provides a step-by-step guide on how to set up the AdventureWorks data source for the ELT pipeline.
 
-#### Step 5: Create Orders Collection
+1.  **Download the Dataset**: Download the AdventureWorks sample database (`.bak` file) from the [official Microsoft documentation](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms).
 
-Load order-related datasets (orders, order items, payments, and reviews). Group items, payments, and reviews by `order_id` and convert them into nested arrays within the order document. Handle missing nested data by replacing NaN values with empty arrays. Convert date columns to proper datetime objects for MongoDB storage.
+    ![AdventureWorks Data Source Guide 1](images/adventureworks_data_source_guide_1.png)
 
-#### Step 6: Insert into MongoDB
+2.  **Restore the Database**: Restore the `.bak` file to your SQL Server instance using SQL Server Management Studio (SSMS).
 
-Connect to your MongoDB instance (local or cloud). Clear existing collections to avoid duplicates, then insert all collections using batch insertion (`insert_many`) for better performance.
+    ![AdventureWorks Data Source Guide 2.1](images/adventureworks_data_source_guide_2_1.png)
+    ![AdventureWorks Data Source Guide 2.2](images/adventureworks_data_source_guide_2_2.png)
+    ![AdventureWorks Data Source Guide 2.3](images/adventureworks_data_source_guide_2_3.png)
 
-> **Note:** The complete data generation script is available in `data_source/mongo/data_generation.ipynb`. All required CSV files are located in the `data_source/mongo/` directory.
+3.  **Create Connections**: Use a database tool like DBeaver to create connections to your SQL Server, MySQL, and PostgreSQL instances.
 
-### AdventureWorks: Relational Databases (MySQL & PostgreSQL)
+    ![AdventureWorks Data Source Guide 3](images/adventureworks_data_source_guide_3.png)
 
-This section describes how to set up the AdventureWorks sample databases for the modern architecture. The process involves restoring the database from SQL Server and migrating data to MySQL and PostgreSQL.
+4.  **Migrate the Data**: Use DBeaver's data migration feature to transfer the data from SQL Server to MySQL and PostgreSQL.
 
-#### Step 1: Download AdventureWorks Dataset
-
-Download the AdventureWorks dataset in `.bak` format from the [Microsoft Learn documentation](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms). Choose the OLTP version that matches your SQL Server version.
-
-![Step 1](images/step_1.png)
-
-#### Step 2: Restore Database Using SSMS
-
-Restore the database using SQL Server Management Studio (SSMS) following Microsoft's instructions:
-
-1. Move the `.bak` file to your SQL Server backup location
-2. Open SSMS and connect to your SQL Server instance
-3. Right-click **Databases** in **Object Explorer** and select **Restore Database...**
-4. Select **Device** and choose the `.bak` file
-5. Check the **Files** tab to confirm restore locations
-6. Select **OK** to restore the database
-
-![Step 2.1](images/step_2_1.png)
-![Step 2.2](images/step_2_2.png)
-![Step 2.3](images/step_2_3.png)
-
-#### Step 3: Create Connections Using DBeaver
-
-Use DBeaver to create connections to your SQL Server, MySQL, and PostgreSQL databases. This will allow you to export and migrate data between databases.
-
-![Step 3](images/step_3.png)
-
-#### Step 4: Migrate Data from SQL Server to PostgreSQL and MySQL
-
-##### Step 4.1: Export Data
-
-In DBeaver, press `Ctrl + Click` to select multiple tables, then right-click and select **Export Data**.
-
-![Step 4.1](images/step_4_1.png)
-
-##### Step 4.2: Select Export Target
-
-Choose **Database tables** as the export target to migrate data directly between databases.
-
-![Step 4.2](images/step_4_2.png)
-
-##### Step 4.3: Configure Target Container and Tables
-
-Select the target database and schemas. Map the AdventureWorks schemas as follows:
-- **MySQL** (`adventureworks-identities`): `person` and `human_resources` schemas
-- **PostgreSQL** (`adventureworks-operations`): `production`, `sales`, and `purchasing` schemas
-
-You can rename columns or change data types during the mapping process to match your requirements.
-
-![Step 4.3](images/step_4_3.png)
-
-##### Step 4.4: Complete Migration
-
-Complete the data migration process. Verify that all tables have been successfully migrated to their respective databases.
-
-![Step 4.4](images/step_4_4.png)
-
-> **Quick Start:** If you want to proceed quickly, you can directly run the pre-exported SQL backup scripts:
-> - `data_source/postgres/production__purchasing__sales.sql` for PostgreSQL
-> - `data_source/mysql/person__human-resources.sql` for MySQL
-
----
+    ![AdventureWorks Data Source Guide 4.1](images/adventureworks_data_source_guide_4_1.png)
+    ![AdventureWorks Data Source Guide 4.2](images/adventureworks_data_source_guide_4_2.png)
+    ![AdventureWorks Data Source Guide 4.3](images/adventureworks_data_source_guide_4_3.png)
+    ![AdventureWorks Data Source Guide 4.4](images/adventureworks_data_source_guide_4_4.png)
