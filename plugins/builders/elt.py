@@ -68,18 +68,14 @@ class ELTBuilder(BaseBuilder):
             "tags": self.dag_tags,
         }
 
+    @property
+    def source_namespace(self):
+        return self.model.source_schema or self.model.source_database
+
     # Source to Landing
     @property
     def gcs_landing_file_name(self):
-        if self.model.source_type == "mysql":
-            base_path = f"data/{self.model.dag_type}/{self.model.source_database}/{self.model.table_name}"
-
-        elif self.model.source_type == "postgres":
-            base_path = f"data/{self.model.dag_type}/{self.model.source_schema}/{self.model.table_name}"
-
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
-
+        base_path = f"data/{self.model.dag_type}/{self.source_namespace}/{self.model.table_name}"
         return base_path + "/date={{ data_interval_start.format('YYYY-MM-DD') }}"
 
     @property
@@ -87,15 +83,6 @@ class ELTBuilder(BaseBuilder):
         return f"gs://{self.model.gcs_bucket_name}/pyspark/{self.model.dag_type}/workflows/source_to_landing.py"
 
     def _get_source_to_landing_task(self):
-        if self.model.source_type == "mysql":
-            jdbc_schema_or_database = self.model.source_database
-
-        elif self.model.source_type == "postgres":
-            jdbc_schema_or_database = self.model.source_schema
-
-        else:
-            raise ValueError(f"Unsupported source_type: {self.model.source_type}")
-
         return SourceToLandingOperator(
             task_id="source_to_landing",
             gcp_conn_id=self.gcp_conn_id,
@@ -104,7 +91,7 @@ class ELTBuilder(BaseBuilder):
             cluster_name=self.model.dataproc_cluster_name,
             source_type=self.model.source_type,
             source_conn_id=self.model.source_conn_id,
-            jdbc_schema_or_database=jdbc_schema_or_database,
+            jdbc_schema_or_database=self.source_namespace,
             table_name=self.model.table_name,
             gcs_bucket_name=self.gcs_bucket_name,
             dag_type=self.model.dag_type,
@@ -117,24 +104,20 @@ class ELTBuilder(BaseBuilder):
     # Landing to Bronze
     @property
     def bronze_table_id(self):
-        namespace = self.model.source_schema or self.model.source_database
-        dataset = f"bronze__{namespace}"
-        return f"{self.gcp_project_id}.{dataset}.{self.model.table_name}"
+        return f"{self.gcp_project_id}.bronze__{self.source_namespace}.{self.model.table_name}"
 
     @property
     def bronze_external_uris(self):
-        namespace = self.model.source_schema or self.model.source_database
         return [
             f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-            f"{namespace}/{self.model.table_name}/*.parquet"
+            f"{self.source_namespace}/{self.model.table_name}/*.parquet"
         ]
 
     @property
     def hive_partition_uri_prefix(self):
-        namespace = self.model.source_schema or self.model.source_database
         return (
             f"gs://{self.gcs_bucket_name}/data/{self.model.dag_type}/"
-            f"{namespace}/{self.model.table_name}/"
+            f"{self.source_namespace}/{self.model.table_name}/"
         )
 
     def _get_landing_to_bronze_task(self):
@@ -151,14 +134,11 @@ class ELTBuilder(BaseBuilder):
     # Bronze to Silver staging
     @property
     def silver_staging_table_id(self):
-        namespace = self.model.source_schema or self.model.source_database
-        dataset = f"silver_staging__{namespace}"
-        return f"{self.gcp_project_id}.{dataset}.{self.model.table_name}"
+        return f"{self.gcp_project_id}.silver_staging__{self.source_namespace}.{self.model.table_name}"
 
     @property
     def silver_staging_gcs_uri(self):
-        namespace = self.model.source_schema or self.model.source_database
-        return f"gs://{self.gcs_bucket_name}/silver_staging/{namespace}/{self.model.table_name}"
+        return f"gs://{self.gcs_bucket_name}/silver_staging/{self.source_namespace}/{self.model.table_name}"
 
     def _get_bronze_to_silver_staging_task(self):
         return BronzeToSilverStagingOperator(
