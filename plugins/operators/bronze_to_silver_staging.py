@@ -44,7 +44,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
         )
 
         try:
-            bronze_dataset_id, bronze_table_name = self.bronze_table_id.split(".")[-2:]
+            bronze_dataset_id, bronze_table_name = self._parse_table_id()
         except ValueError:
             raise ValueError(f"Invalid bronze_table_id format: {self.bronze_table_id}")
 
@@ -52,7 +52,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
             rows = fetch_information_schema_columns(
                 hook=hook,
                 project_id=self.project_id,
-                dataset_id=bronze_dataset_id,
+            dataset_id=bronze_dataset_id,
                 table_name=bronze_table_name,
                 select_mode="ddl",
             )
@@ -109,6 +109,7 @@ class BronzeToSilverStagingOperator(BaseOperator):
 
             bronze_schema = self._get_bronze_schema(hook)
             create_ddl = self._build_create_partitioned_table_ddl(bronze_schema)
+            self.log.info(f"CREATE TABLE DDL: {create_ddl}")
 
             self.log.info("Executing CREATE TABLE DDL for partitioned table...")
             hook.insert_job(

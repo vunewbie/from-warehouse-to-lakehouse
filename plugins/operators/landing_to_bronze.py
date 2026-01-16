@@ -1,5 +1,5 @@
 import json
-from typing import Sequence, Optional, List, Dict
+from typing import Sequence
 
 from airflow.models.baseoperator import BaseOperator
 from airflow.models import Variable
